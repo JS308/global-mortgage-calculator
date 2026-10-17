@@ -9,9 +9,9 @@ const planSwitch = document.getElementById("plan-switch");
 const scheduleBody = document.getElementById("schedule-body");
 const chartNote = document.getElementById("chart-note");
 const interestChartNote = document.getElementById("interest-chart-note");
-const CHART_SRC = "vendor/chart.umd.min.js";
-const HTML2CANVAS_SRC = "vendor/html2canvas.min.js";
-const JSPDF_SRC = "vendor/jspdf.umd.min.js";
+const CHART_SRC = "https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js";
+const HTML2CANVAS_SRC = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+const JSPDF_SRC = "https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js";
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2";
 
 let viewPlans = [];
@@ -33,15 +33,15 @@ document.getElementById("export-schedule").addEventListener("click", exportSelec
 document.getElementById("export-pdf").addEventListener("click", () => {
   const button = document.getElementById("export-pdf");
   button.disabled = true;
-  button.textContent = "正在生成…";
+  button.textContent = "Creating…";
   createPdfReport()
-    .then((pdf) => pdf.save("房贷月供报告.pdf"))
+    .then((pdf) => pdf.save("mortgage-payoff-report.pdf"))
     .catch((error) => {
-      message.textContent = error.message || "生成 PDF 失败";
+      message.textContent = error.message || "Could not create the PDF";
     })
     .finally(() => {
       button.disabled = false;
-      button.textContent = "导出PDF报告";
+      button.textContent = "Export PDF report";
     });
 });
 
@@ -51,23 +51,20 @@ document.getElementById("add-extra").addEventListener("click", () => {
 bindAmountInput(document.getElementById("principal"));
 bindAmountInput(document.getElementById("spare"));
 bindAmountInput(document.getElementById("refi-fee"));
-bindAmountInput(document.getElementById("fund-principal"));
-bindAmountInput(document.getElementById("commercial-principal"));
-bindAmountInput(document.getElementById("combo-prepay"));
 bindAmountInput(document.getElementById("prepay"));
+bindAmountInput(document.getElementById("pmi"));
+bindAmountInput(document.getElementById("property-tax"));
+bindAmountInput(document.getElementById("home-insurance"));
 
-const modeSingleButton = document.getElementById("mode-single");
-const modeComboButton = document.getElementById("mode-combo");
-const singleFields = document.getElementById("single-fields");
-const comboFields = document.getElementById("combo-fields");
-const comboBreakdown = document.getElementById("combo-breakdown");
-const comboExtraNote = document.getElementById("combo-extra");
-let loanMode = "single";
+const loanFixedButton = document.getElementById("loan-fixed");
+const loanArmButton = document.getElementById("loan-arm");
+const armFields = document.getElementById("arm-fields");
+let loanType = "fixed";
 const modeButtonOn = "rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white";
 const modeButtonOff = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800";
 
-modeSingleButton.addEventListener("click", () => setLoanMode("single"));
-modeComboButton.addEventListener("click", () => setLoanMode("combo"));
+loanFixedButton.addEventListener("click", () => setLoanType("fixed"));
+loanArmButton.addEventListener("click", () => setLoanType("arm"));
 
 const methodInstallmentButton = document.getElementById("method-installment");
 const methodPrincipalButton = document.getElementById("method-principal");
@@ -81,7 +78,7 @@ document.getElementById("balance-chart").closest("details").addEventListener("to
   if (balanceChart) balanceChart.resize();
   if (interestChart) interestChart.resize();
 });
-["years", "fund-years", "commercial-years", "paid-months"].forEach((id) => {
+["years", "arm-years", "paid-months"].forEach((id) => {
   document.getElementById(id).addEventListener("input", refreshRemaining);
 });
 
@@ -97,114 +94,52 @@ form.addEventListener("submit", (event) => {
   const missing = missingRequiredFields();
   markMissingFields(missing);
   if (missing.length) {
-    message.textContent = "请先填写必填项：" + missing.map((item) => item[1]).join("、");
+    message.textContent = "Fill in the required fields: " + missing.map((item) => item[1]).join(", ");
     message.scrollIntoView({ block: "nearest" });
     document.getElementById(missing[0][0]).focus();
     return;
   }
 
   try {
-    let years;
-    let extras;
-    let paid = 0;
-    if (loanMode === "combo") {
-      years = null;
-      extras = null;
-    } else {
-      years = readYears("years", "贷款年限");
-      paid = readPaidMonths(years * 12);
-      extras = readExtras(years, paid);
-    }
+    const years = readYears("years", "Loan term");
+    const paid = readPaidMonths(years * 12);
+    const extras = readExtras(years, paid);
+    const arm = readArm(years);
+    const housing = readHousing();
     const opportunityInput = readOpportunity();
     const refinanceInput = readRefinance();
-    let principal;
-    let rate;
-    let ratePercent;
-    let original;
-    let combo = null;
-    let comboInput = null;
-    let planExtras = extras;
-    let singlePrepay = 0;
+    const principal = readDollar("principal");
+    const ratePercent = readNumber("rate");
+    const rate = ratePercent / 100;
+    const singlePrepay = readOptionalPrepay("prepay");
+    const planExtras = extras.slice();
+    if (singlePrepay > 0) planExtras.push({ 月份: 1, 金额: singlePrepay });
+    const original = runSchedule(repayMethod, "shorten", principal, rate, years, null, paid, arm);
+    const originalInterest = sumInterest(original);
+    const originalPayment = original[0].月供;
+    const interestSummary = buildInterestSummary({ original, principal, rate, years, paid, arm });
+    const monthlyHousing = roundMoney(originalPayment + housing.monthlyEscrow);
 
-    if (loanMode === "combo") {
-      comboInput = readCombo();
-      years = Math.max(comboInput.fundYears, comboInput.commercialYears);
-      paid = readPaidMonths(years * 12);
-      extras = readExtras(years, paid);
-      planExtras = extras.slice();
-      if (comboInput.prepay > 0) planExtras.push({ 月份: 1, 金额: comboInput.prepay });
-      combo = calcComboLoan({
-        fundPrincipal: comboInput.fund,
-        fundRate: comboInput.fundRate / 100,
-        fundYears: comboInput.fundYears,
-        commercialPrincipal: comboInput.commercial,
-        commercialRate: comboInput.commercialRate / 100,
-        commercialYears: comboInput.commercialYears,
-        extraPayments: planExtras,
-        method: repayMethod,
-        elapsed: paid,
-      });
-      principal = roundMoney(comboInput.fund + comboInput.commercial);
-      rate = null;
-      ratePercent = null;
-      original = combo.原计划;
-    } else {
-      principal = readWan("principal");
-      ratePercent = readNumber("rate");
-      rate = ratePercent / 100;
-      singlePrepay = readOptionalPrepay("prepay");
-      planExtras = extras.slice();
-      if (singlePrepay > 0) planExtras.push({ 月份: 1, 金额: singlePrepay });
-      original = amortize(repayMethod).base(principal, rate, years, null, paid);
-    }
-
-    const originalInterest = combo ? combo.总利息 : sumInterest(original);
-    const originalPayment = combo ? combo.总月供 : original[0].月供;
-    const interestSummary = buildInterestSummary({
-      combo,
-      comboInput,
-      original,
-      principal,
-      rate,
-      years,
-      paid,
-    });
-
-    payment.textContent = formatYuan(originalPayment);
+    payment.textContent = formatMoney(monthlyHousing);
+    renderHousing(originalPayment, housing);
     renderInterestSplit(interestSummary);
-    renderComboSummary(combo);
 
     let shortened = null;
     let reduced = null;
-    if (combo) {
-      shortened = combo.优先商贷 ? combo.优先商贷.计划 : null;
-      reduced = combo.优先商贷减少月供 ? combo.优先商贷减少月供.计划 : null;
-    } else if (planExtras.length > 0) {
-      const calc = amortize(repayMethod);
-      shortened = calc.base(principal, rate, years, planExtras, paid);
-      reduced = calc.reduce(principal, rate, years, planExtras, paid);
+    if (planExtras.length > 0) {
+      shortened = runSchedule(repayMethod, "shorten", principal, rate, years, planExtras, paid, arm);
+      reduced = runSchedule(repayMethod, "reduce", principal, rate, years, planExtras, paid, arm);
     }
     const opportunity = opportunityInput
-      ? loanMode === "combo"
-        ? opportunityFromCombo(comboInput, opportunityInput.cash, opportunityInput.ratePercent / 100, repayMethod, paid)
-        : calcOpportunity(principal, rate, years, opportunityInput.cash, opportunityInput.ratePercent / 100, repayMethod, paid)
+      ? calcOpportunity(principal, rate, years, opportunityInput.cash, opportunityInput.ratePercent / 100, repayMethod, paid, arm)
       : null;
     const refinance = refinanceInput
-      ? loanMode === "combo"
-        ? calcComboRefinance(
-          comboInput.fund,
-          comboInput.fundRate / 100,
-          comboInput.fundYears,
-          comboInput.commercial,
-          comboInput.commercialRate / 100,
-          comboInput.commercialYears,
-          refinanceInput.ratePercent / 100,
-          refinanceInput.fee,
-          repayMethod,
-          paid
-        )
-        : calcRefinance(principal, rate, years, refinanceInput.ratePercent / 100, refinanceInput.fee, repayMethod, paid)
+      ? calcRefinance(principal, rate, years, refinanceInput.ratePercent / 100, refinanceInput.fee, repayMethod, paid, arm)
       : null;
+    const biweekly = document.getElementById("biweekly").checked
+      ? calcBiweekly(principal, rate, years, paid, repayMethod, arm)
+      : null;
+    renderBiweekly(biweekly);
     const comparisonRows = buildComparisonRows({
       original,
       originalInterest,
@@ -214,16 +149,8 @@ form.addEventListener("submit", (event) => {
       reduced,
       opportunity,
       refinance,
-      combo: Boolean(combo && combo.优先商贷),
-      comboExtraSaved: combo ? combo.额外节省利息 : 0,
-      commercialEnd: combo && combo.优先商贷 ? combo.优先商贷.商贷还清月份 : null,
-      fundEnd: combo && combo.优先商贷 ? combo.优先商贷.公积金还清月份 : null,
-      commercialMonths: combo ? combo.商贷月数 : null,
-      fundMonths: combo ? combo.公积金月数 : null,
-      fundYears: comboInput ? comboInput.fundYears : null,
-      commercialYears: comboInput ? comboInput.commercialYears : null,
-      fundFirst: combo ? combo.优先公积金 : null,
-      methodLabel: repayMethod === "principal" ? "等额本金" : "等额本息",
+      biweekly,
+      methodLabel: repayMethod === "principal" ? "Equal principal" : "Fixed payment",
     });
     renderComparison(comparisonRows);
     result.hidden = false;
@@ -232,35 +159,20 @@ form.addEventListener("submit", (event) => {
       original,
       shortened,
       reduced,
-      fundFirst: combo ? combo.优先公积金 : null,
       opportunity,
       refinance,
-      combo: Boolean(combo),
+      biweekly,
     }));
     latestReport = {
       principal,
       ratePercent,
       years,
       extras: planExtras.slice(),
-      combo: combo && comboInput
-        ? {
-          fundPrincipal: comboInput.fund,
-          fundRatePercent: comboInput.fundRate,
-          fundYears: comboInput.fundYears,
-          commercialPrincipal: comboInput.commercial,
-          commercialRatePercent: comboInput.commercialRate,
-          commercialYears: comboInput.commercialYears,
-          fundPayment: combo.公积金月供,
-          commercialPayment: combo.商贷月供,
-          fundInterest: interestSummary.fundFull,
-          commercialInterest: interestSummary.commercialFull,
-          fundRemainingInterest: interestSummary.fundRemaining,
-          commercialRemainingInterest: interestSummary.commercialRemaining,
-          extraSaved: combo.额外节省利息,
-          priorityNote: comboPriorityNote(combo),
-          prepay: comboInput.prepay,
-        }
-        : null,
+      loanType,
+      arm: arm ? { fixedYears: arm.fixedYears, adjustedPercent: roundMoney(arm.adjustedRate * 100) } : null,
+      housing,
+      monthlyHousing,
+      biweekly,
       originalPayment,
       originalInterest,
       interestSummary,
@@ -299,9 +211,9 @@ function addExtraRow() {
   const row = document.createElement("div");
   row.className = "extra-row grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2";
   row.innerHTML = [
-    '<label class="block text-sm font-medium text-slate-700">在多少期时还款<input class="extra-remaining ' + fieldClass + '" type="text" inputmode="numeric" placeholder="例如 120" autocomplete="off"></label>',
-    '<label class="block text-sm font-medium text-slate-700">还多少钱（万元）<input class="extra-amount ' + fieldClass + '" type="text" inputmode="decimal" placeholder="例如 10" autocomplete="off"></label>',
-    '<button type="button" class="remove justify-self-start text-sm font-medium text-rose-700 sm:col-span-2">删除</button>',
+    '<label class="block text-sm font-medium text-slate-700">Payment number<input class="extra-remaining ' + fieldClass + '" type="text" inputmode="numeric" placeholder="e.g. 120" autocomplete="off"></label>',
+    '<label class="block text-sm font-medium text-slate-700">Amount<input class="extra-amount ' + fieldClass + '" type="text" inputmode="decimal" placeholder="e.g. 10,000" autocomplete="off"></label>',
+    '<button type="button" class="remove justify-self-start text-sm font-medium text-rose-700 sm:col-span-2">Remove</button>',
   ].join("");
   row.querySelector(".remove").addEventListener("click", () => row.remove());
   bindAmountInput(row.querySelector(".extra-amount"));
@@ -309,40 +221,27 @@ function addExtraRow() {
   return row;
 }
 
-function setLoanMode(mode) {
-  loanMode = mode;
-  const combo = mode === "combo";
-  singleFields.hidden = combo;
-  comboFields.hidden = !combo;
-  modeSingleButton.className = combo ? modeButtonOff : modeButtonOn;
-  modeComboButton.className = combo ? modeButtonOn : modeButtonOff;
-  document.getElementById("principal").required = !combo;
-  document.getElementById("rate").required = !combo;
-  document.getElementById("years").required = !combo;
-  document.getElementById("years-field").hidden = combo;
-  document.getElementById("single-prepay").hidden = combo;
-  ["fund-principal", "fund-rate", "fund-years", "commercial-principal", "commercial-rate", "commercial-years"].forEach((id) => {
-    document.getElementById(id).required = combo;
-  });
+function setLoanType(type) {
+  loanType = type === "arm" ? "arm" : "fixed";
+  const arm = loanType === "arm";
+  armFields.hidden = !arm;
+  loanFixedButton.className = arm ? modeButtonOff : modeButtonOn;
+  loanArmButton.className = arm ? modeButtonOn : modeButtonOff;
+  document.getElementById("rate-label").textContent = arm ? "Initial interest rate (%)" : "Interest rate (%)";
+  document.getElementById("arm-years").required = arm;
+  document.getElementById("arm-rate").required = arm;
   markMissingFields([]);
-  refreshRemaining();
 }
 
 function missingRequiredFields() {
-  const fields = loanMode === "combo"
-    ? [
-      ["fund-principal", "公积金贷款金额（万元）"],
-      ["fund-rate", "公积金年利率（%）"],
-      ["fund-years", "公积金年限"],
-      ["commercial-principal", "商贷金额（万元）"],
-      ["commercial-rate", "商贷年利率（%）"],
-      ["commercial-years", "商贷年限"],
-    ]
-    : [
-      ["principal", "贷款总额（万元）"],
-      ["rate", "年利率（%）"],
-      ["years", "贷款年限"],
-    ];
+  const fields = [
+    ["principal", "loan amount"],
+    ["rate", "interest rate"],
+    ["years", "loan term"],
+  ];
+  if (loanType === "arm") {
+    fields.push(["arm-years", "ARM fixed period"], ["arm-rate", "adjusted rate"]);
+  }
   return fields.filter(([id]) => document.getElementById(id).value.trim() === "");
 }
 
@@ -356,98 +255,70 @@ function setRepayMethod(method) {
   const principal = repayMethod === "principal";
   methodInstallmentButton.className = principal ? modeButtonOff : modeButtonOn;
   methodPrincipalButton.className = principal ? modeButtonOn : modeButtonOff;
-  methodBadge.textContent = principal ? "等额本金" : "等额本息";
+  methodBadge.textContent = principal ? "Equal principal" : "Fixed payment";
 }
 
-function readCombo() {
-  const fund = readWan("fund-principal");
-  const fundRate = readNumber("fund-rate");
-  const commercial = readWan("commercial-principal");
-  const commercialRate = readNumber("commercial-rate");
-  const fundYears = readYears("fund-years", "公积金年限");
-  const commercialYears = readYears("commercial-years", "商贷年限");
-  if (!Number.isFinite(fund) || roundMoney(fund) <= 0) {
-    throw new Error("公积金贷款金额必须是大于 0 的数字");
+function readArm(years) {
+  if (loanType !== "arm") return null;
+  const fixedYears = readYears("arm-years", "ARM fixed period");
+  const adjustedPercent = readNumber("arm-rate");
+  if (!Number.isFinite(adjustedPercent) || adjustedPercent < 0) {
+    throw new Error("Adjusted rate must be a number greater than or equal to 0");
   }
-  if (!Number.isFinite(fundRate) || fundRate < 0) {
-    throw new Error("公积金利率必须是大于等于 0 的数字");
+  if (fixedYears >= years) {
+    throw new Error("ARM fixed period must be shorter than the loan term");
   }
-  if (!Number.isFinite(commercial) || roundMoney(commercial) <= 0) {
-    throw new Error("商贷金额必须是大于 0 的数字");
-  }
-  if (!Number.isFinite(commercialRate) || commercialRate < 0) {
-    throw new Error("商贷利率必须是大于等于 0 的数字");
-  }
-  const prepayRaw = document.getElementById("combo-prepay").value.trim();
-  let prepay = 0;
-  if (prepayRaw !== "") {
-    prepay = Number(prepayRaw.replace(/,/g, ""));
-    if (!Number.isFinite(prepay) || prepay < 0) {
-      throw new Error("提前还款金额必须是大于等于 0 的数字");
-    }
-    prepay = wanToYuan(prepay);
-  }
+  return { fixedYears, adjustedRate: adjustedPercent / 100 };
+}
+
+function readHousing() {
+  const pmi = readOptionalMoney("pmi", "PMI");
+  const propertyTax = readOptionalMoney("property-tax", "Property tax");
+  const insurance = readOptionalMoney("home-insurance", "Home insurance");
   return {
-    fund: roundMoney(fund),
-    fundRate,
-    fundYears,
-    commercial: roundMoney(commercial),
-    commercialRate,
-    commercialYears,
-    prepay,
+    pmi,
+    propertyTax,
+    insurance,
+    taxMonthly: roundMoney(propertyTax / 12),
+    insuranceMonthly: roundMoney(insurance / 12),
+    monthlyEscrow: roundMoney(pmi + propertyTax / 12 + insurance / 12),
   };
+}
+
+function renderHousing(principalAndInterest, housing) {
+  document.getElementById("pi-payment").textContent = formatMoney(principalAndInterest);
+  document.getElementById("pmi-payment").textContent = formatMoney(housing.pmi);
+  document.getElementById("tax-payment").textContent = formatMoney(housing.taxMonthly);
+  document.getElementById("insurance-payment").textContent = formatMoney(housing.insuranceMonthly);
+}
+
+function renderBiweekly(result) {
+  const box = document.getElementById("biweekly-box");
+  if (!result) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  document.getElementById("biweekly-payment").textContent = formatMoney(result.biweeklyPayment);
+  const lines = [
+    "26 payments a year. Paid off " + result.monthsSaved + " months sooner and saves " + formatMoney(result.savedInterest) + " in interest versus the monthly plan.",
+  ];
+  if (result.laterBiweeklyPayment !== result.biweeklyPayment) {
+    lines.push("After the ARM adjusts, the bi-weekly draft becomes " + formatMoney(result.laterBiweeklyPayment) + ".");
+  }
+  document.getElementById("biweekly-note").textContent = lines.join(" ");
 }
 
 function buildInterestSummary(input) {
   const paid = input.paid || 0;
-  if (input.combo) {
-    const fundRemaining = input.combo.公积金总利息;
-    const commercialRemaining = input.combo.商贷总利息;
-    const remaining = input.combo.总利息;
-    if (paid <= 0) {
-      rememberPaidHistory(input.original, 0);
-      return {
-        paid,
-        combo: true,
-        full: remaining,
-        remaining,
-        fundFull: fundRemaining,
-        fundRemaining,
-        commercialFull: commercialRemaining,
-        commercialRemaining,
-      };
-    }
-    const fullCombo = calcComboLoan({
-      fundPrincipal: input.comboInput.fund,
-      fundRate: input.comboInput.fundRate / 100,
-      fundYears: input.comboInput.fundYears,
-      commercialPrincipal: input.comboInput.commercial,
-      commercialRate: input.comboInput.commercialRate / 100,
-      commercialYears: input.comboInput.commercialYears,
-      extraPayments: [],
-      method: repayMethod,
-      elapsed: 0,
-    });
-    rememberPaidHistory(fullCombo.原计划, paid);
-    return {
-      paid,
-      combo: true,
-      full: fullCombo.总利息,
-      remaining,
-      fundFull: fullCombo.公积金总利息,
-      fundRemaining,
-      commercialFull: fullCombo.商贷总利息,
-      commercialRemaining,
-    };
-  }
   const remaining = sumInterest(input.original);
   if (paid <= 0) {
     rememberPaidHistory(input.original, 0);
-    return { paid, combo: false, full: remaining, remaining };
+    return { paid, full: remaining, remaining };
   }
-  const full = amortize(repayMethod).base(input.principal, input.rate, input.years);
+  const full = runSchedule(repayMethod, "shorten", input.principal, input.rate, input.years, null, 0, input.arm);
   rememberPaidHistory(full, paid);
-  return { paid, combo: false, full: sumInterest(full), remaining };
+  return { paid, full: sumInterest(full), remaining };
 }
 
 function rememberPaidHistory(schedule, paid) {
@@ -482,38 +353,24 @@ function interestProgress(summary) {
 }
 
 function renderInterestSplit(summary) {
-  document.getElementById("original-interest").textContent = formatYuan(summary.full);
+  document.getElementById("original-interest").textContent = formatMoney(summary.full);
   const wrap = document.getElementById("interest-progress-wrap");
-  const box = document.getElementById("interest-breakdown");
   const note = document.getElementById("schedule-paid-note");
   if (summary.paid > 0) {
     const percent = interestProgress(summary);
     wrap.hidden = false;
-    document.getElementById("remaining-interest").textContent = formatYuan(summary.remaining);
-    document.getElementById("interest-percent").textContent = "已还 " + percent + "%";
+    document.getElementById("remaining-interest").textContent = formatMoney(summary.remaining);
+    document.getElementById("interest-percent").textContent = percent + "% paid";
     const bar = document.getElementById("interest-progress");
     bar.style.width = percent + "%";
     bar.parentElement.setAttribute("aria-valuenow", String(percent));
     bar.parentElement.setAttribute("aria-valuemin", "0");
     bar.parentElement.setAttribute("aria-valuemax", "100");
-    note.textContent = "着色的行是已还的 " + summary.paid + " 期";
+    note.textContent = "Shaded rows are the " + summary.paid + " payments already made";
   } else {
     wrap.hidden = true;
     note.textContent = "";
   }
-  if (!summary.combo) {
-    box.hidden = true;
-    return;
-  }
-  document.getElementById("fund-interest").textContent = formatYuan(summary.fundFull);
-  document.getElementById("commercial-interest").textContent = formatYuan(summary.commercialFull);
-  document.getElementById("fund-remaining-interest").textContent = summary.paid > 0
-    ? "剩余 " + formatYuan(summary.fundRemaining)
-    : "";
-  document.getElementById("commercial-remaining-interest").textContent = summary.paid > 0
-    ? "剩余 " + formatYuan(summary.commercialRemaining)
-    : "";
-  box.hidden = false;
 }
 
 function refreshRemaining() {
@@ -522,22 +379,12 @@ function refreshRemaining() {
   const paid = paidRaw === "" ? 0 : Number(paidRaw);
   const paidOk = Number.isInteger(paid) && paid >= 0;
   if (!paidOk) {
-    box.textContent = "已还款期数不正确";
-    return;
-  }
-  if (loanMode === "combo") {
-    const fundYears = readNumber("fund-years");
-    const commercialYears = readNumber("commercial-years");
-    if (!Number.isInteger(fundYears) || fundYears <= 0 || !Number.isInteger(commercialYears) || commercialYears <= 0) {
-      box.textContent = "填写年限后显示";
-      return;
-    }
-    box.textContent = "公积金 " + formatRemaining(fundYears * 12, paid) + "\n商贷 " + formatRemaining(commercialYears * 12, paid);
+    box.textContent = "Payments already made must be a whole number";
     return;
   }
   const years = readNumber("years");
   if (!Number.isInteger(years) || years <= 0) {
-    box.textContent = "填写年限后显示";
+    box.textContent = "Enter a term to see this";
     return;
   }
   box.textContent = formatRemaining(years * 12, paid);
@@ -545,8 +392,8 @@ function refreshRemaining() {
 
 function formatRemaining(total, paid) {
   const left = total - paid;
-  if (left <= 0) return "已还清";
-  return left + " 期";
+  if (left <= 0) return "Paid off";
+  return left + " payments";
 }
 
 function readPaidMonths(maxMonths) {
@@ -554,88 +401,16 @@ function readPaidMonths(maxMonths) {
   if (raw === "") return 0;
   const paid = Number(raw);
   if (!Number.isInteger(paid) || paid < 0) {
-    throw new Error("已还款期数必须是大于等于 0 的整数");
+    throw new Error("Payments already made must be a whole number greater than or equal to 0");
   }
   if (paid >= maxMonths) {
-    throw new Error("已还款期数要小于贷款期数 " + maxMonths);
+    throw new Error("Payments already made must be less than the " + maxMonths + " payments in the loan term");
   }
   return paid;
 }
 
-function comboPriorityNote(combo) {
-  if (!combo || !combo.优先商贷) return "";
-  const extra = combo.额外节省利息;
-  if (extra > 0) return "优先还商贷，比先还公积金多省 " + formatYuan(extra) + " 利息";
-  if (extra < 0) return "按这两笔利率，先还公积金比先还商贷多省 " + formatYuan(-extra) + " 利息";
-  return "先还商贷和先还公积金省下的利息相同";
-}
-
-function renderComboSummary(combo) {
-  if (!combo) {
-    comboBreakdown.hidden = true;
-    comboExtraNote.hidden = true;
-    comboExtraNote.textContent = "";
-    return;
-  }
-  document.getElementById("fund-payment").textContent = formatYuan(combo.公积金月供);
-  document.getElementById("commercial-payment").textContent = formatYuan(combo.商贷月供);
-  comboBreakdown.hidden = false;
-  const note = comboPriorityNote(combo);
-  comboExtraNote.hidden = note === "";
-  comboExtraNote.textContent = note;
-}
-
-function opportunityFromCombo(comboInput, cash, depositRate, method, elapsed) {
-  const result = calcComboLoan({
-    fundPrincipal: comboInput.fund,
-    fundRate: comboInput.fundRate / 100,
-    fundYears: comboInput.fundYears,
-    commercialPrincipal: comboInput.commercial,
-    commercialRate: comboInput.commercialRate / 100,
-    commercialYears: comboInput.commercialYears,
-    extraPayments: [{ 月份: 1, 金额: cash }],
-    method,
-    elapsed,
-  });
-  const deposit = calcDepositGrowth(cash, depositRate, result.原期数);
-  return {
-    缩短节省利息: result.优先商贷.节省利息,
-    缩短月供: result.总月供,
-    还清月份: result.优先商贷.还清月份,
-    提前月数: result.原期数 - result.优先商贷.还清月份,
-    减供节省利息: result.优先商贷减少月供.节省利息,
-    减供月供: result.优先商贷减少月供.之后月供,
-    减供期数: result.优先商贷减少月供.计划.length,
-    商贷还清月份: result.优先商贷.商贷还清月份,
-    公积金还清月份: result.优先商贷.公积金还清月份,
-    商贷月数: result.商贷月数,
-    公积金月数: result.公积金月数,
-    原期数: result.原期数,
-    存款收益: deposit.收益,
-    到期金额: deposit.到期金额,
-    缩短计划: result.优先商贷.计划,
-    减供计划: result.优先商贷减少月供.计划,
-  };
-}
-
-function comboPriorityDetail(extraSaved) {
-  if (extraSaved > 0) return "比先还公积金多省 " + formatYuan(extraSaved);
-  if (extraSaved < 0) return "比先还公积金少省 " + formatYuan(-extraSaved);
-  return "和先还公积金省的利息相同";
-}
-
-function partEndText(commercialMonth, fundMonth) {
-  return "商贷 " + formatTerm(commercialMonth).replace(/ /g, "") + "还清 · 公积金 " + formatTerm(fundMonth).replace(/ /g, "") + "还清";
-}
-
 function readOptionalPrepay(id) {
-  const raw = document.getElementById(id).value.trim();
-  if (raw === "") return 0;
-  const value = Number(raw.replace(/,/g, ""));
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error("提前还款金额必须是大于等于 0 的数字");
-  }
-  return wanToYuan(value);
+  return readOptionalMoney(id, "Extra principal payment");
 }
 
 function readExtras(years, paid) {
@@ -651,15 +426,15 @@ function readExtras(years, paid) {
     const period = Number(periodRaw);
     const firstPeriod = elapsed + 1;
     if (!Number.isInteger(period) || period < firstPeriod || period > totalMonths) {
-      throw new Error("第 " + index + " 条分批还款的期数要在 " + firstPeriod + " 到 " + totalMonths + " 之间");
+      throw new Error("Extra payment " + index + " must fall between payment " + firstPeriod + " and " + totalMonths);
     }
     const amount = Number(amountRaw);
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error("第 " + index + " 条分批还款的金额必须大于 0");
+      throw new Error("Extra payment " + index + " amount must be greater than 0");
     }
     extras.push({
       月份: period - elapsed,
-      金额: wanToYuan(amount),
+      金额: roundMoney(amount),
     });
   });
   return extras;
@@ -670,21 +445,21 @@ function readOpportunity() {
   const rateRaw = document.getElementById("deposit-rate").value.trim();
   if (cashRaw === "" && rateRaw === "") return null;
   if (cashRaw === "" || rateRaw === "") {
-    throw new Error("机会成本对比需要同时填写闲钱金额和年化利率");
+    throw new Error("Opportunity cost needs both the cash amount and the APY");
   }
-  const cash = wanToYuan(Number(cashRaw.replace(/,/g, "")));
+  const cash = roundMoney(Number(cashRaw.replace(/,/g, "")));
   const ratePercent = Number(rateRaw);
-  if (!Number.isFinite(cash) || roundMoney(cash) <= 0) {
-    throw new Error("手头闲钱必须是大于 0 的数字");
+  if (!Number.isFinite(cash) || cash <= 0) {
+    throw new Error("Cash on hand must be a number greater than 0");
   }
   if (!Number.isFinite(ratePercent) || ratePercent < 0) {
-    throw new Error("存款或理财年化利率必须是大于等于 0 的数字");
+    throw new Error("Savings or investment APY must be a number greater than or equal to 0");
   }
   return { cash, ratePercent };
 }
 
 function formatBenefit(amount) {
-  const text = formatYuan(Math.abs(amount));
+  const text = formatMoney(Math.abs(amount));
   if (amount > 0) return "+" + text;
   if (amount < 0) return "-" + text;
   return text;
@@ -694,100 +469,92 @@ function readRefinance() {
   const rateRaw = document.getElementById("refi-rate").value.trim();
   const feeRaw = document.getElementById("refi-fee").value.trim();
   if (rateRaw === "" && feeRaw === "") return null;
-  if (rateRaw === "") throw new Error("用新贷还旧贷需要填写新贷款年利率");
+  if (rateRaw === "") throw new Error("Enter the new interest rate to compare a refinance");
   const ratePercent = Number(rateRaw);
   const fee = feeRaw === "" ? 0 : roundMoney(Number(feeRaw.replace(/,/g, "")));
   if (!Number.isFinite(ratePercent) || ratePercent < 0) {
-    throw new Error("新贷款年利率必须是大于等于 0 的数字");
+    throw new Error("Refinance rate must be a number greater than or equal to 0");
   }
-  if (!Number.isFinite(fee) || roundMoney(fee) < 0) {
-    throw new Error("转贷手续费必须是大于等于 0 的数字");
+  if (!Number.isFinite(fee) || fee < 0) {
+    throw new Error("Refinance closing costs must be a number greater than or equal to 0");
   }
-  return { ratePercent, fee: roundMoney(fee) };
+  return { ratePercent, fee };
 }
 
 function formatPayback(result) {
-  if (result.手续费 <= 0) return "无手续费";
-  if (result.回本月数 == null) return "期限内无法回本";
+  if (result.手续费 <= 0) return "No closing costs";
+  if (result.回本月数 == null) return "Does not break even during the term";
   return formatTerm(result.回本月数);
-}
-
-function formatSavedInterest(saved) {
-  if (saved < 0) return "多付 " + formatYuan(-saved);
-  return formatYuan(saved);
 }
 
 function buildComparisonRows(input) {
   const totalMonths = input.original.length;
   const rows = [{
-    name: "原计划",
-    note: input.fundYears
-      ? input.methodLabel + "，公积金" + input.fundYears + "年，商贷" + input.commercialYears + "年"
-      : input.methodLabel + "，按当前利率还满" + formatTerm(totalMonths).replace(/ /g, ""),
+    name: "Original plan",
+    note: input.methodLabel + ", full remaining term of " + formatTerm(totalMonths),
     benefit: 0,
     order: 50,
   }];
   if (input.shortened) {
-    const lines = input.combo
-      ? comboShortenNotes(input.commercialMonths, input.commercialEnd, input.fundMonths, input.fundEnd)
-      : [shortenNote(totalMonths, input.shortened.length)];
-    if (input.combo) lines.push(comboPriorityDetail(input.comboExtraSaved));
     rows.push({
-      name: input.combo ? "优先还商贷" : "提前还款缩短年限",
-      note: lines.join("\n"),
+      name: "Extra principal, shorter term",
+      note: shortenNote(totalMonths, input.shortened.length),
       benefit: roundMoney(input.originalInterest - sumInterest(input.shortened)),
       order: 10,
     });
   }
-  if (input.fundFirst) {
+  if (input.biweekly) {
+    const item = input.biweekly;
+    const lines = [
+      formatMoney(item.biweeklyPayment) + " every two weeks",
+      shortenNote(item.monthlyMonths, item.payoffMonths),
+    ];
+    if (item.laterBiweeklyPayment !== item.biweeklyPayment) {
+      lines.push("After the adjustment, " + formatMoney(item.laterBiweeklyPayment) + " every two weeks");
+    }
     rows.push({
-      name: "优先还公积金",
-      note: comboShortenNotes(input.commercialMonths, input.fundFirst.商贷还清月份, input.fundMonths, input.fundFirst.公积金还清月份).join("\n"),
-      benefit: input.fundFirst.节省利息,
-      order: 12,
+      name: "Bi-weekly payments",
+      note: lines.join("\n"),
+      benefit: item.savedInterest,
+      order: 15,
     });
   }
   if (input.reduced) {
-    const payment = reducedMonthlyPayment(input.reduced, input.extras, totalMonths, input.originalPayment);
+    const paymentAmount = reducedMonthlyPayment(input.reduced, input.extras, totalMonths, input.originalPayment);
     rows.push({
-      name: input.combo ? "优先还商贷减少月供" : "提前还款减少月供",
-      note: paymentChangeNote(input.originalPayment, payment),
+      name: "Extra principal, lower payment",
+      note: paymentChangeNote(input.originalPayment, paymentAmount),
       benefit: roundMoney(input.originalInterest - sumInterest(input.reduced)),
       order: 20,
     });
   }
   if (input.opportunity) {
     const item = input.opportunity;
-    const shortenLines = item.商贷月数 != null
-      ? comboShortenNotes(item.商贷月数, item.商贷还清月份, item.公积金月数, item.公积金还清月份)
-      : [shortenNote(item.原期数, item.还清月份)];
     rows.push({
-      name: "闲钱缩短年限",
-      note: shortenLines.join("\n"),
+      name: "Cash toward a shorter term",
+      note: shortenNote(item.原期数, item.还清月份),
       benefit: item.缩短节省利息,
       order: 30,
     });
     rows.push({
-      name: "闲钱减少月供",
+      name: "Cash toward a lower payment",
       note: paymentChangeNote(item.缩短月供, item.减供月供),
       benefit: item.减供节省利息,
       order: 35,
     });
     rows.push({
-      name: "存款月复利",
-      note: "到期 " + formatYuan(item.到期金额) + "，存" + formatTerm(item.原期数).replace(/ /g, ""),
+      name: "Monthly compounded savings",
+      note: formatMoney(item.到期金额) + " at maturity, saved for " + formatTerm(item.原期数),
       benefit: item.存款收益,
       order: 40,
     });
   }
   if (input.refinance) {
     const item = input.refinance;
-    const lines = [paymentChangeNote(input.originalPayment, item.新月供)];
-    if (item.组合) lines.push("公积金月供不变，商贷新月供 " + formatYuan(item.商贷新月供));
-    lines.push("回本：" + formatPayback(item));
-    if (item.手续费 > 0) lines.push("已扣手续费 " + formatYuan(item.手续费));
+    const lines = [paymentChangeNote(input.originalPayment, item.新月供), "Break-even: " + formatPayback(item)];
+    if (item.手续费 > 0) lines.push("Closing costs of " + formatMoney(item.手续费) + " already deducted");
     rows.push({
-      name: "转贷",
+      name: "Refinance",
       note: lines.join("\n"),
       benefit: roundMoney(item.节省利息 - item.手续费),
       order: 60,
@@ -812,7 +579,7 @@ function buildComparisonRows(input) {
 function readYears(id, label) {
   const years = readNumber(id);
   if (!Number.isInteger(years) || years <= 0) {
-    throw new Error(label + "必须是大于 0 的整数");
+    throw new Error(label + " must be a whole number of years greater than 0");
   }
   return years;
 }
@@ -822,26 +589,17 @@ function monthsShortened(total, end) {
   return Math.max(0, total - end);
 }
 
-function shortenNote(total, end, part) {
+function shortenNote(total, end) {
   const months = monthsShortened(total, end);
-  const name = part || "";
-  if (months <= 0) return name + "年限未缩短";
-  return name + "缩短了 " + months + " 个月";
-}
-
-function comboShortenNotes(commercialMonths, commercialEnd, fundMonths, fundEnd) {
-  const lines = [];
-  if (monthsShortened(commercialMonths, commercialEnd) > 0) lines.push(shortenNote(commercialMonths, commercialEnd, "商贷"));
-  if (monthsShortened(fundMonths, fundEnd) > 0) lines.push(shortenNote(fundMonths, fundEnd, "公积金"));
-  if (!lines.length) lines.push("年限未缩短");
-  return lines;
+  if (months <= 0) return "Term is not shortened";
+  return "Pays off " + months + " months sooner";
 }
 
 function paymentChangeNote(before, after) {
   const drop = roundMoney(before - after);
-  if (drop > 0) return "月供减少了 " + formatYuan(drop);
-  if (drop < 0) return "月供增加了 " + formatYuan(-drop);
-  return "月供未减少";
+  if (drop > 0) return "Payment drops by " + formatMoney(drop);
+  if (drop < 0) return "Payment rises by " + formatMoney(-drop);
+  return "Payment stays the same";
 }
 
 function renderComparison(rows) {
@@ -858,8 +616,8 @@ function renderComparison(rows) {
     bad: "bg-rose-50 text-rose-950",
   };
   const rankText = {
-    best: "最优",
-    second: "次优",
+    best: "Best",
+    second: "Next",
   };
   rows.forEach((row) => {
     const tr = document.createElement("tr");
@@ -894,9 +652,9 @@ function reducedMonthlyPayment(schedule, extras, originalMonths, originalPayment
 function formatTerm(totalMonths) {
   const years = Math.floor(totalMonths / 12);
   const months = totalMonths % 12;
-  if (years === 0) return months + " 个月";
-  if (months === 0) return years + " 年";
-  return years + " 年 " + months + " 个月";
+  if (years === 0) return months + (months === 1 ? " month" : " months");
+  if (months === 0) return years + (years === 1 ? " year" : " years");
+  return years + (years === 1 ? " year " : " years ") + months + (months === 1 ? " month" : " months");
 }
 
 function sumInterest(schedule) {
@@ -909,14 +667,28 @@ function readNumber(id) {
   return Number(raw);
 }
 
-function wanToYuan(wan) {
-  return roundMoney(wan * 10000);
+function readDollar(id) {
+  const amount = readNumber(id);
+  if (!Number.isFinite(amount)) return amount;
+  return roundMoney(amount);
 }
 
-function readWan(id) {
-  const wan = readNumber(id);
-  if (!Number.isFinite(wan)) return wan;
-  return wanToYuan(wan);
+function readOptionalMoney(id, label) {
+  const raw = document.getElementById(id).value.trim();
+  if (raw === "") return 0;
+  const value = Number(raw.replace(/,/g, ""));
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(label + " must be a number greater than or equal to 0");
+  }
+  return roundMoney(value);
+}
+
+function formatMoney(amount) {
+  const sign = amount < 0 ? "-" : "";
+  return sign + "$" + Math.abs(roundMoney(amount)).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatAmountInput(value) {
@@ -951,35 +723,17 @@ function bindAmountInput(input) {
   });
 }
 
-function formatYuan(amount) {
-  const sign = amount < 0 ? "-" : "";
-  const abs = Math.abs(amount);
-  if (abs >= 100000000) {
-    return sign + (abs / 100000000).toLocaleString("zh-CN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) + " 亿元";
-  }
-  if (abs >= 100000) {
-    return sign + (abs / 10000).toLocaleString("zh-CN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) + " 万元";
-  }
-  return sign + Math.round(abs).toLocaleString("zh-CN") + " 元";
-}
-
 function chartPlans(input) {
-  const plans = [{ id: "original", name: "原计划", schedule: input.original, color: "#64748b" }];
+  const plans = [{ id: "original", name: "Original plan", schedule: input.original, color: "#64748b" }];
   const add = (id, name, schedule, color) => {
     if (schedule && schedule.length) plans.push({ id, name, schedule, color });
   };
-  add("extra-shorten", input.combo ? "优先还商贷" : "提前还款缩短年限", input.shortened, "#dc2626");
-  add("extra-reduce", input.combo ? "优先还商贷减少月供" : "提前还款减少月供", input.reduced, "#2563eb");
-  add("fund-first", "优先还公积金", input.fundFirst && input.fundFirst.计划, "#16a34a");
-  add("spare-shorten", "闲钱缩短年限", input.opportunity && input.opportunity.缩短计划, "#ea580c");
-  add("spare-reduce", "闲钱减少月供", input.opportunity && input.opportunity.减供计划, "#9333ea");
-  add("refinance", "转贷", input.refinance && input.refinance.计划, "#0891b2");
+  add("extra-shorten", "Extra principal, shorter term", input.shortened, "#dc2626");
+  add("extra-reduce", "Extra principal, lower payment", input.reduced, "#2563eb");
+  add("biweekly", "Bi-weekly payments", input.biweekly && input.biweekly.schedule, "#16a34a");
+  add("spare-shorten", "Cash toward a shorter term", input.opportunity && input.opportunity.缩短计划, "#ea580c");
+  add("spare-reduce", "Cash toward a lower payment", input.opportunity && input.opportunity.减供计划, "#9333ea");
+  add("refinance", "Refinance", input.refinance && input.refinance.计划, "#0891b2");
   return plans;
 }
 
@@ -1024,7 +778,7 @@ function loadScript(src) {
         return;
       }
       existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("脚本加载失败")), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Could not load a required script")), { once: true });
       return;
     }
     const script = document.createElement("script");
@@ -1034,7 +788,7 @@ function loadScript(src) {
       script.dataset.loaded = "1";
       resolve();
     };
-    script.onerror = () => reject(new Error("脚本加载失败"));
+    script.onerror = () => reject(new Error("Could not load a required script"));
     document.head.appendChild(script);
   });
 }
@@ -1113,12 +867,9 @@ function interestChartPoints(plan) {
   return points;
 }
 
-function wanTick(value) {
-  if (Math.abs(value) >= 10000) {
-    const wan = value / 10000;
-    return (Number.isInteger(wan) ? String(wan) : wan.toFixed(1)) + "万";
-  }
-  return value;
+function moneyTick(value) {
+  const sign = value < 0 ? "-" : "";
+  return sign + "$" + Math.round(Math.abs(value)).toLocaleString("en-US");
 }
 
 function lineChartOptions(staticImage, compact) {
@@ -1145,7 +896,7 @@ function lineChartOptions(staticImage, compact) {
       x: {
         type: "linear",
         min: 0,
-        title: { display: !compact, text: "月份" },
+        title: { display: !compact, text: "Month" },
         ticks: {
           maxTicksLimit: compact ? 4 : 6,
           font: tickFont,
@@ -1154,7 +905,7 @@ function lineChartOptions(staticImage, compact) {
       },
       y: {
         beginAtZero: true,
-        ticks: { callback: wanTick, font: tickFont },
+        ticks: { callback: moneyTick, font: tickFont },
       },
     },
   };
@@ -1162,7 +913,7 @@ function lineChartOptions(staticImage, compact) {
 
 function applyChartFont() {
   if (typeof Chart === "undefined") return;
-  Chart.defaults.font.family = '"Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif';
+  Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
 }
 
 async function renderChart(startingBalance) {
@@ -1175,14 +926,14 @@ async function renderChart(startingBalance) {
     await loadScript(CHART_SRC);
   } catch (error) {
     if (token !== chartToken) return;
-    const note = "折线图没有加载完成，请刷新页面后重试。";
+    const note = "The chart did not finish loading. Refresh the page and try again.";
     chartNote.textContent = note;
     interestChartNote.textContent = note;
     return;
   }
   if (token !== chartToken) return;
   if (typeof Chart === "undefined") {
-    const note = "折线图没有加载完成，请刷新页面后重试。";
+    const note = "The chart did not finish loading. Refresh the page and try again.";
     chartNote.textContent = note;
     interestChartNote.textContent = note;
     return;
@@ -1252,7 +1003,7 @@ function renderTable() {
   displaySchedule(plan).forEach((row, index) => {
     const tr = document.createElement("tr");
     tr.className = row.已还 ? "paid-row" : (index % 2 === 1 ? "bg-slate-50" : "");
-    [row.月份, formatYuan(row.月供), formatYuan(row.本金部分), formatYuan(row.利息部分), formatYuan(row.剩余本金)]
+    [row.月份, formatMoney(row.月供), formatMoney(row.本金部分), formatMoney(row.利息部分), formatMoney(row.剩余本金)]
       .forEach((text, cellIndex) => {
         const cell = document.createElement("td");
         cell.className = cellIndex === 0
@@ -1283,7 +1034,7 @@ function renderExportOptions() {
 }
 
 function buildCsv(plan) {
-  const lines = ["期数,月供,本金,利息,剩余本金"];
+  const lines = ["Payment,Amount,Principal,Interest,Balance"];
   displaySchedule(plan).forEach((row) => {
     lines.push([
       row.月份,
@@ -1302,7 +1053,7 @@ function exportSelectedPlans() {
   );
   const plans = viewPlans.filter((plan) => selected.has(plan.id));
   if (!plans.length) {
-    message.textContent = "请至少勾选一种还款计划";
+    message.textContent = "Select at least one schedule";
     return;
   }
   message.textContent = "";
@@ -1310,7 +1061,7 @@ function exportSelectedPlans() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = plans.length === 1 ? "还款计划-" + plans[0].name + ".csv" : "还款计划.csv";
+  link.download = plans.length === 1 ? "amortization-" + plans[0].name + ".csv" : "amortization-schedules.csv";
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1318,7 +1069,7 @@ function exportSelectedPlans() {
 }
 
 function formatReportDate(date) {
-  return date.getFullYear() + "年" + (date.getMonth() + 1) + "月" + date.getDate() + "日";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
 function pdfEl(tag, className, text) {
@@ -1329,38 +1080,37 @@ function pdfEl(tag, className, text) {
 }
 
 function pdfFacts(report) {
-  const method = report.repayMethod === "principal" ? "等额本金" : "等额本息";
-  const paid = report.paid > 0 ? "已还 " + report.paid + " 期" : "";
-  if (report.combo) {
-    const item = report.combo;
-    return [
-      method,
-      "公积金 " + formatYuan(item.fundPrincipal) + " · " + item.fundRatePercent + "% · " + item.fundYears + " 年",
-      "商贷 " + formatYuan(item.commercialPrincipal) + " · " + item.commercialRatePercent + "% · " + item.commercialYears + " 年",
-      paid,
-    ].filter(Boolean).join("  ·  ");
-  }
+  const method = report.repayMethod === "principal" ? "Equal principal" : "Fixed payment";
+  const paid = report.paid > 0 ? report.paid + " payments already made" : "";
+  const loan = report.arm
+    ? report.arm.fixedYears + "-year ARM, then " + report.arm.adjustedPercent + "%"
+    : "Fixed-rate";
   return [
+    loan,
     method,
-    formatYuan(report.principal),
+    formatMoney(report.principal),
     report.ratePercent + "%",
-    report.years + " 年",
+    report.years + " years",
     paid,
   ].filter(Boolean).join("  ·  ");
 }
 
 function pdfActionLine(report) {
   const parts = [];
-  const prepay = report.combo ? report.combo.prepay : (report.prepay || 0);
-  if (!report.combo && prepay > 0) parts.push("提前还款 " + formatYuan(prepay));
+  const prepay = report.prepay || 0;
+  if (prepay > 0) parts.push("Extra principal " + formatMoney(prepay));
   report.extras.forEach((item) => {
     if (prepay > 0 && item.月份 === 1 && item.金额 === prepay) return;
-    parts.push("从下一期起第 " + item.月份 + " 个月，分批还 " + formatYuan(item.金额));
+    parts.push("Payment " + item.月份 + ": extra principal " + formatMoney(item.金额));
   });
-  if (report.opportunity) {
-    parts.push("手头闲钱 " + formatYuan(report.opportunity.cash) + "，存款年化 " + report.opportunity.depositRatePercent + "%");
+  if (report.biweekly) parts.push("Bi-weekly " + formatMoney(report.biweekly.biweeklyPayment));
+  if (report.housing && report.housing.monthlyEscrow > 0) {
+    parts.push("PMI " + formatMoney(report.housing.pmi) + ", tax " + formatMoney(report.housing.propertyTax) + "/yr, insurance " + formatMoney(report.housing.insurance) + "/yr");
   }
-  if (report.refinance) parts.push("转贷利率 " + report.refinance.ratePercent + "%");
+  if (report.opportunity) {
+    parts.push("Cash on hand " + formatMoney(report.opportunity.cash) + " at " + report.opportunity.depositRatePercent + "% APY");
+  }
+  if (report.refinance) parts.push("Refinance rate " + report.refinance.ratePercent + "%");
   return parts.join("  ·  ");
 }
 
@@ -1373,8 +1123,7 @@ function pdfProgress(percent) {
 }
 
 function pdfTermText(report) {
-  if (!report.combo) return formatTerm(report.years * 12);
-  return "公积金 " + formatTerm(report.combo.fundYears * 12) + " · 商贷 " + formatTerm(report.combo.commercialYears * 12);
+  return formatTerm(report.years * 12);
 }
 
 function pdfStat(label, value, className, sub) {
@@ -1387,35 +1136,30 @@ function pdfStat(label, value, className, sub) {
 function pdfSummary(report) {
   const card = pdfEl("section", "pdf-summary");
   const summary = report.interestSummary;
-  card.append(pdfStat("每月月供", formatYuan(report.originalPayment), "pdf-stat-lg"));
-  if (report.combo) {
-    const payments = pdfEl("div", "pdf-pair");
-    payments.append(
-      pdfStat("公积金月供", formatYuan(report.combo.fundPayment)),
-      pdfStat("商贷月供", formatYuan(report.combo.commercialPayment))
-    );
-    card.append(payments);
-    if (report.combo.priorityNote) card.append(pdfEl("p", "pdf-caption", report.combo.priorityNote));
+  const housing = report.housing || { pmi: 0, taxMonthly: 0, insuranceMonthly: 0 };
+  card.append(pdfStat("Monthly housing payment", formatMoney(report.monthlyHousing || report.originalPayment), "pdf-stat-lg"));
+  const payments = pdfEl("div", "pdf-pair");
+  payments.append(
+    pdfStat("Principal & interest", formatMoney(report.originalPayment)),
+    pdfStat("PMI", formatMoney(housing.pmi)),
+    pdfStat("Property tax", formatMoney(housing.taxMonthly)),
+    pdfStat("Home insurance", formatMoney(housing.insuranceMonthly))
+  );
+  card.append(payments);
+  if (report.biweekly) {
+    card.append(pdfEl("p", "pdf-caption", "Bi-weekly principal and interest " + formatMoney(report.biweekly.biweeklyPayment) + ". Saves " + formatMoney(report.biweekly.savedInterest) + " and " + report.biweekly.monthsSaved + " months versus monthly payments."));
   }
-  card.append(pdfStat("总利息", formatYuan(summary.full), "pdf-stat-md"));
+  card.append(pdfStat("Total interest", formatMoney(summary.full), "pdf-stat-md"));
   if (report.paid > 0) {
     const percent = interestProgress(summary);
     const line = pdfEl("div", "pdf-remain");
     line.append(
-      pdfEl("span", "", "剩余利息 " + formatYuan(summary.remaining)),
-      pdfEl("span", "", "已还 " + percent + "%")
+      pdfEl("span", "", "Interest remaining " + formatMoney(summary.remaining)),
+      pdfEl("span", "", percent + "% paid")
     );
     card.append(line, pdfProgress(percent));
-  } else if (!report.combo) {
-    card.append(pdfStat("还款期数", pdfTermText(report), "pdf-stat-gap"));
-  }
-  if (summary.combo) {
-    const interests = pdfEl("div", "pdf-pair");
-    interests.append(
-      pdfStat("公积金总利息", formatYuan(summary.fundFull), "", report.paid > 0 ? "剩余 " + formatYuan(summary.fundRemaining) : ""),
-      pdfStat("商贷总利息", formatYuan(summary.commercialFull), "", report.paid > 0 ? "剩余 " + formatYuan(summary.commercialRemaining) : "")
-    );
-    card.append(interests);
+  } else {
+    card.append(pdfStat("Loan term", pdfTermText(report), "pdf-stat-gap"));
   }
   return card;
 }
@@ -1437,10 +1181,10 @@ function pdfBar(name, amount, maxAbs, color, best) {
 
 function pdfBenefit(report) {
   const section = pdfEl("section", "pdf-section");
-  section.append(pdfEl("h2", "", "方案净收益"));
+  section.append(pdfEl("h2", "", "Net benefit"));
   const rows = report.comparison || [];
   if (rows.length < 2) {
-    section.append(pdfEl("p", "pdf-caption", "当前只有原计划。填写提前还款、分批还款、手头闲钱或转贷后，这里会比较各方案少付多少利息。"));
+    section.append(pdfEl("p", "pdf-caption", "Only the original plan is shown. Add extra principal, bi-weekly payments, cash on hand, or a refinance to compare interest."));
     return section;
   }
   const maxAbs = rows.reduce((max, row) => Math.max(max, Math.abs(row.benefit)), 0);
@@ -1453,13 +1197,13 @@ function pdfBenefit(report) {
   };
   rows.forEach((row) => {
     const name = row.tone === "best"
-      ? row.name + " · 最优"
+      ? row.name + " · Best"
       : row.tone === "second"
-        ? row.name + " · 次优"
+        ? row.name + " · Next"
         : row.name;
     section.append(pdfBar(name, row.benefit, maxAbs, colors[row.tone] || "#475569", row.tone === "best"));
   });
-  section.append(pdfEl("p", "pdf-caption", "条形长度按净收益的绝对值。正数是比原计划少付的利息。"));
+  section.append(pdfEl("p", "pdf-caption", "Bar length follows the absolute net benefit. A positive amount is interest saved versus the original plan."));
   return section;
 }
 
@@ -1472,17 +1216,17 @@ function chartStartingBalance(report) {
 
 async function pdfCharts(report) {
   const section = pdfEl("section", "pdf-section");
-  section.append(pdfEl("h2", "", "还款走势"));
+  section.append(pdfEl("h2", "", "Payoff trend"));
   if (typeof Chart === "undefined" || !viewPlans.length) {
-    section.append(pdfEl("p", "pdf-caption", "走势图需要加载 Chart.js。方案对比见上方的净收益条形图。"));
+    section.append(pdfEl("p", "pdf-caption", "The trend chart needs Chart.js. The net-benefit bars above still compare the strategies."));
     return section;
   }
   applyChartFont();
   const start = chartStartingBalance(report);
   const grid = pdfEl("div", "pdf-charts");
   const charts = [
-    ["剩余本金", "balance"],
-    ["剩余利息", "interest"],
+    ["Remaining balance", "balance"],
+    ["Remaining interest", "interest"],
   ];
   for (const [title, kind] of charts) {
     const card = pdfEl("div", "pdf-chart-card");
@@ -1502,20 +1246,20 @@ function pdfOpportunity(report) {
   const item = report.opportunity;
   const outcome = item.result;
   const section = pdfEl("section", "pdf-panel");
-  section.append(pdfEl("h2", "", "闲钱去向"));
+  section.append(pdfEl("h2", "", "Where the cash goes"));
   const rows = [
-    ["缩短年限", outcome.缩短节省利息, "#b45309"],
-    ["减少月供", outcome.减供节省利息, "#7c3aed"],
-    ["存款月复利", outcome.存款收益, "#0f172a"],
+    ["Shorter term", outcome.缩短节省利息, "#b45309"],
+    ["Lower payment", outcome.减供节省利息, "#7c3aed"],
+    ["Compounded savings", outcome.存款收益, "#0f172a"],
   ];
   const maxAbs = Math.max(...rows.map((row) => Math.abs(row[1])), 1);
   rows.forEach((row) => section.append(pdfBar(row[0], row[1], maxAbs, row[2], false)));
   const prepayBest = Math.max(outcome.缩短节省利息, outcome.减供节省利息);
   const diff = roundMoney(Math.abs(prepayBest - outcome.存款收益));
-  let verdict = "提前还款和存款收益相同";
-  if (prepayBest > outcome.存款收益) verdict = "提前还款比存款多 " + formatYuan(diff);
-  if (outcome.存款收益 > prepayBest) verdict = "存款比提前还款多 " + formatYuan(diff);
-  section.append(pdfEl("p", "pdf-caption", "年化 " + item.depositRatePercent + "%，到期 " + formatYuan(outcome.到期金额) + "。" + verdict + "。"));
+  let verdict = "Paying extra and saving earn the same amount";
+  if (prepayBest > outcome.存款收益) verdict = "Paying extra beats saving by " + formatMoney(diff);
+  if (outcome.存款收益 > prepayBest) verdict = "Saving beats paying extra by " + formatMoney(diff);
+  section.append(pdfEl("p", "pdf-caption", item.depositRatePercent + "% APY grows to " + formatMoney(outcome.到期金额) + ". " + verdict + "."));
   return section;
 }
 
@@ -1523,21 +1267,19 @@ function pdfRefinance(report) {
   const item = report.refinance;
   const outcome = item.result;
   const section = pdfEl("section", "pdf-panel");
-  section.append(pdfEl("h2", "", "转贷"));
+  section.append(pdfEl("h2", "", "Refinance"));
   const grid = pdfEl("div", "pdf-mini");
   [
-    ["新月供", formatYuan(outcome.新月供)],
-    ["扣费后净收益", formatBenefit(roundMoney(outcome.节省利息 - item.fee))],
-    ["回本", formatPayback(outcome)],
+    ["New payment", formatMoney(outcome.新月供)],
+    ["Net benefit", formatBenefit(roundMoney(outcome.节省利息 - item.fee))],
+    ["Break-even", formatPayback(outcome)],
   ].forEach(([label, value]) => {
     const box = pdfEl("div", "pdf-mini-item");
     box.append(pdfEl("span", "", label), pdfEl("strong", "", value));
     grid.append(box);
   });
   section.append(grid);
-  section.append(pdfEl("p", "pdf-caption", outcome.组合
-    ? "公积金月供不变。新商贷利率 " + item.ratePercent + "%，手续费 " + formatYuan(item.fee) + "。"
-    : "期限不变。新利率 " + item.ratePercent + "%，手续费 " + formatYuan(item.fee) + "。"));
+  section.append(pdfEl("p", "pdf-caption", "The remaining term stays the same. New rate " + item.ratePercent + "%, closing costs " + formatMoney(item.fee) + "."));
   return section;
 }
 
@@ -1555,7 +1297,7 @@ async function buildPdfSheet(report, dateText) {
   const sheet = pdfEl("div", "pdf-sheet");
   const top = pdfEl("div", "pdf-top");
   const titles = pdfEl("div", "");
-  titles.append(pdfEl("h1", "", "房贷还款策略报告"));
+  titles.append(pdfEl("h1", "", "Mortgage payoff report"));
   titles.append(pdfEl("p", "pdf-kicker", pdfFacts(report)));
   const action = pdfActionLine(report);
   if (action) titles.append(pdfEl("p", "pdf-kicker", action));
@@ -1564,7 +1306,7 @@ async function buildPdfSheet(report, dateText) {
   sheet.append(await pdfCharts(report));
   const side = pdfSide(report);
   if (side) sheet.append(side);
-  sheet.append(pdfEl("p", "pdf-foot", "净收益按尚未支付的利息计算。转贷已扣除手续费。曲线从下一期起，不含已还期数。"));
+  sheet.append(pdfEl("p", "pdf-foot", "Net benefit uses interest still to be paid. Refinance is shown after closing costs. Charts start with the next payment and leave out payments already made."));
   return sheet;
 }
 
@@ -1585,7 +1327,7 @@ async function capturePdfNode(host, node) {
 }
 
 async function createPdfReport() {
-  if (!latestReport) throw new Error("请先计算后再导出");
+  if (!latestReport) throw new Error("Calculate a loan before exporting");
   try {
     await Promise.all([
       loadScript(HTML2CANVAS_SRC),
@@ -1593,10 +1335,10 @@ async function createPdfReport() {
       loadScript(CHART_SRC).catch(() => {}),
     ]);
   } catch (error) {
-    throw new Error("导出 PDF 需要的组件没有加载完成，请刷新页面后重试。");
+    throw new Error("The PDF tools did not finish loading. Refresh the page and try again.");
   }
   if (typeof html2canvas !== "function" || !window.jspdf || !window.jspdf.jsPDF) {
-    throw new Error("导出 PDF 需要的组件没有加载完成，请刷新页面后重试。");
+    throw new Error("The PDF tools did not finish loading. Refresh the page and try again.");
   }
   const pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
   const host = pdfEl("div", "pdf-root");
