@@ -100,6 +100,23 @@ input.field-missing {
   background: #fff1f2;
 }
 
+.site-footer {
+  margin: 1.5rem auto 0;
+  width: 100%;
+  max-width: 36rem;
+  padding: 0 1rem 2rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.site-footer a {
+  color: #334155;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 #schedule-body tr.paid-row td {
   background: #e0e7ff;
   color: #334155;

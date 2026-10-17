@@ -9,9 +9,9 @@ const planSwitch = document.getElementById("plan-switch");
 const scheduleBody = document.getElementById("schedule-body");
 const chartNote = document.getElementById("chart-note");
 const interestChartNote = document.getElementById("interest-chart-note");
-const CHART_SRC = "https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js";
-const HTML2CANVAS_SRC = "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js";
-const JSPDF_SRC = "https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js";
+const CHART_SRC = "vendor/chart.umd.min.js";
+const HTML2CANVAS_SRC = "vendor/html2canvas.min.js";
+const JSPDF_SRC = "vendor/jspdf.umd.min.js";
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2";
 
 let viewPlans = [];
@@ -1175,14 +1175,14 @@ async function renderChart(startingBalance) {
     await loadScript(CHART_SRC);
   } catch (error) {
     if (token !== chartToken) return;
-    const note = "折线图需要加载 Chart.js，请检查网络后刷新。";
+    const note = "折线图没有加载完成，请刷新页面后重试。";
     chartNote.textContent = note;
     interestChartNote.textContent = note;
     return;
   }
   if (token !== chartToken) return;
   if (typeof Chart === "undefined") {
-    const note = "折线图需要加载 Chart.js，请检查网络后刷新。";
+    const note = "折线图没有加载完成，请刷新页面后重试。";
     chartNote.textContent = note;
     interestChartNote.textContent = note;
     return;
@@ -1593,10 +1593,10 @@ async function createPdfReport() {
       loadScript(CHART_SRC).catch(() => {}),
     ]);
   } catch (error) {
-    throw new Error("导出 PDF 需要加载 jsPDF 和 html2canvas，请检查网络后刷新。");
+    throw new Error("导出 PDF 需要的组件没有加载完成，请刷新页面后重试。");
   }
   if (typeof html2canvas !== "function" || !window.jspdf || !window.jspdf.jsPDF) {
-    throw new Error("导出 PDF 需要加载 jsPDF 和 html2canvas，请检查网络后刷新。");
+    throw new Error("导出 PDF 需要的组件没有加载完成，请刷新页面后重试。");
   }
   const pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
   const host = pdfEl("div", "pdf-root");
