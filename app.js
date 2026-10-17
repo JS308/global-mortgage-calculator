@@ -299,7 +299,7 @@ function addExtraRow() {
   const row = document.createElement("div");
   row.className = "extra-row grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2";
   row.innerHTML = [
-    '<label class="block text-sm font-medium text-slate-700">剩余多少个月<input class="extra-remaining ' + fieldClass + '" type="text" inputmode="numeric" placeholder="240" autocomplete="off"></label>',
+    '<label class="block text-sm font-medium text-slate-700">在多少期时还款<input class="extra-remaining ' + fieldClass + '" type="text" inputmode="numeric" placeholder="例如 120" autocomplete="off"></label>',
     '<label class="block text-sm font-medium text-slate-700">还多少钱（万元）<input class="extra-amount ' + fieldClass + '" type="text" inputmode="decimal" placeholder="例如 10" autocomplete="off"></label>',
     '<button type="button" class="remove justify-self-start text-sm font-medium text-rose-700 sm:col-span-2">删除</button>',
   ].join("");
@@ -640,24 +640,25 @@ function readOptionalPrepay(id) {
 
 function readExtras(years, paid) {
   const totalMonths = years * 12;
-  const horizon = totalMonths - (paid || 0);
+  const elapsed = paid || 0;
   const extras = [];
   let index = 0;
   extraList.querySelectorAll(".extra-row").forEach((row) => {
-    const remainingRaw = row.querySelector(".extra-remaining").value.trim();
+    const periodRaw = row.querySelector(".extra-remaining").value.trim();
     const amountRaw = row.querySelector(".extra-amount").value.trim().replace(/,/g, "");
-    if (remainingRaw === "" && amountRaw === "") return;
+    if (periodRaw === "" && amountRaw === "") return;
     index += 1;
-    const remaining = Number(remainingRaw);
-    if (!Number.isInteger(remaining) || remaining < 1 || remaining > horizon) {
-      throw new Error("第 " + index + " 条分批还款的剩余月数要在 1 到 " + horizon + " 之间");
+    const period = Number(periodRaw);
+    const firstPeriod = elapsed + 1;
+    if (!Number.isInteger(period) || period < firstPeriod || period > totalMonths) {
+      throw new Error("第 " + index + " 条分批还款的期数要在 " + firstPeriod + " 到 " + totalMonths + " 之间");
     }
     const amount = Number(amountRaw);
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error("第 " + index + " 条分批还款的金额必须大于 0");
     }
     extras.push({
-      月份: horizon - remaining + 1,
+      月份: period - elapsed,
       金额: wanToYuan(amount),
     });
   });
@@ -693,7 +694,7 @@ function readRefinance() {
   const rateRaw = document.getElementById("refi-rate").value.trim();
   const feeRaw = document.getElementById("refi-fee").value.trim();
   if (rateRaw === "" && feeRaw === "") return null;
-  if (rateRaw === "") throw new Error("转贷分析需要填写新贷款年利率");
+  if (rateRaw === "") throw new Error("用新贷还旧贷需要填写新贷款年利率");
   const ratePercent = Number(rateRaw);
   const fee = feeRaw === "" ? 0 : roundMoney(Number(feeRaw.replace(/,/g, "")));
   if (!Number.isFinite(ratePercent) || ratePercent < 0) {
