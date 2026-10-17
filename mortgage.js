@@ -1,11 +1,11 @@
 /**
  * 等额本息：每月还款额固定，前期利息多、后期本金多。
- * 额外还款在当月月供之外再冲抵本金，月供金额不变，贷款会提前还清。
+ * 分批还款在当月月供之外再冲抵本金，月供金额不变，贷款会提前还清。
  *
  * @param {number} principal 贷款总额（元），例如 1000000
  * @param {number} annualRate 年利率（小数），例如 3.5% 写成 0.035
  * @param {number} years 贷款年限，例如 30
- * @param {Array<{月份: number, 金额: number}>} [extraPayments] 额外还款，同一月份会合并
+ * @param {Array<{月份: number, 金额: number}>} [extraPayments] 分批还款，同一月份会合并
  * @returns {Array<{月份: number, 月供: number, 本金部分: number, 利息部分: number, 剩余本金: number}>}
  */
 function calcEqualInstallment(principal, annualRate, years, extraPayments, elapsed) {
@@ -109,7 +109,7 @@ function calcReducedPayment(principal, annualRate, years, extraPayments, elapsed
 
 /**
  * 等额本金：每月偿还的本金固定，利息按剩余本金计算，月供逐月下降。
- * 额外还款在当月月供之外再冲抵本金，每月本金不变，贷款会提前还清。
+ * 分批还款在当月月供之外再冲抵本金，每月本金不变，贷款会提前还清。
  */
 function calcEqualPrincipal(principal, annualRate, years, extraPayments, elapsed) {
   return runEqualPrincipal(principal, annualRate, years, extraPayments, "shorten", elapsed);
@@ -297,14 +297,14 @@ function principalInstallment(principal, months) {
 function groupExtraPayments(extraPayments, months) {
   if (extraPayments == null) return new Map();
   if (!Array.isArray(extraPayments)) {
-    throw new Error("额外还款必须是列表");
+    throw new Error("分批还款必须是列表");
   }
 
   const grouped = new Map();
   extraPayments.forEach((item, index) => {
     const month = item && item.月份;
     const amount = item && item.金额;
-    const label = "第 " + (index + 1) + " 条额外还款";
+    const label = "第 " + (index + 1) + " 条分批还款";
     if (!Number.isInteger(month) || month < 1 || month > months) {
       throw new Error(label + "的月份要在 1 到 " + months + " 之间");
     }
