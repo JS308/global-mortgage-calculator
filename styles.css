@@ -83,6 +83,23 @@ details[open] > summary::after {
   background: #0f172a;
 }
 
+#message:not(:empty) {
+  margin-top: 0.75rem;
+  border: 1px solid #fecdd3;
+  border-radius: 0.75rem;
+  background: #fff1f2;
+  padding: 0.75rem 1rem;
+  color: #9f1239;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+input.field-missing {
+  border-color: #be123c;
+  background: #fff1f2;
+}
+
 #schedule-body tr.paid-row td {
   background: #e0e7ff;
   color: #334155;

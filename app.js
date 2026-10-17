@@ -84,10 +84,23 @@ document.getElementById("balance-chart").closest("details").addEventListener("to
   document.getElementById(id).addEventListener("input", refreshRemaining);
 });
 
+form.addEventListener("input", (event) => {
+  if (event.target.classList) event.target.classList.remove("field-missing");
+});
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   message.textContent = "";
   result.hidden = true;
+
+  const missing = missingRequiredFields();
+  markMissingFields(missing);
+  if (missing.length) {
+    message.textContent = "请先填写必填项：" + missing.map((item) => item[1]).join("、");
+    message.scrollIntoView({ block: "nearest" });
+    document.getElementById(missing[0][0]).focus();
+    return;
+  }
 
   try {
     let years;
@@ -304,7 +317,31 @@ function setLoanMode(mode) {
   ["fund-principal", "fund-rate", "fund-years", "commercial-principal", "commercial-rate", "commercial-years"].forEach((id) => {
     document.getElementById(id).required = combo;
   });
+  markMissingFields([]);
   refreshRemaining();
+}
+
+function missingRequiredFields() {
+  const fields = loanMode === "combo"
+    ? [
+      ["fund-principal", "公积金贷款金额（万元）"],
+      ["fund-rate", "公积金年利率（%）"],
+      ["fund-years", "公积金年限"],
+      ["commercial-principal", "商贷金额（万元）"],
+      ["commercial-rate", "商贷年利率（%）"],
+      ["commercial-years", "商贷年限"],
+    ]
+    : [
+      ["principal", "贷款总额（万元）"],
+      ["rate", "年利率（%）"],
+      ["years", "贷款年限"],
+    ];
+  return fields.filter(([id]) => document.getElementById(id).value.trim() === "");
+}
+
+function markMissingFields(missing) {
+  document.querySelectorAll("input.field-missing").forEach((input) => input.classList.remove("field-missing"));
+  missing.forEach(([id]) => document.getElementById(id).classList.add("field-missing"));
 }
 
 function setRepayMethod(method) {
