@@ -1,0 +1,484 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.pdf-root {
+  position: fixed;
+  left: -8000px;
+  top: 0;
+  width: 720px;
+  background: #fff;
+  color: #0f172a;
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+}
+
+.pdf-sheet { padding: 4px 2px 8px; }
+
+.pdf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #0f172a;
+}
+
+.pdf-head strong { font-size: 22px; }
+
+.pdf-head span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.pdf-root p {
+  margin: 0 0 6px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.pdf-root h2 {
+  margin: 16px 0 8px;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.pdf-root .pdf-block h2 {
+  margin: 0 0 8px;
+}
+
+.pdf-root .pdf-block p:last-child { margin-bottom: 0; }
+
+.pdf-root table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-root th,
+.pdf-root td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.pdf-root th {
+  background: #f8fafc;
+  font-weight: 650;
+}
+
+.pdf-num td,
+.pdf-num th { text-align: right; }
+
+.pdf-num td:first-child,
+.pdf-num th:first-child { text-align: left; }
+
+.pdf-saved {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pdf-saved p {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.pdf-saved strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.pdf-best td { background: #ecfdf5; color: #064e3b; }
+.pdf-second td { background: #f0f9ff; color: #0c4a6e; }
+.pdf-ok td { background: #fffbeb; color: #78350f; }
+.pdf-base td { background: #f8fafc; }
+.pdf-bad td { background: #fff1f2; color: #881337; }
+.pdf-root td.pdf-money { text-align: right; font-weight: 650; white-space: nowrap; }
+
+.pdf-saved .a { background: #ecfdf5; color: #064e3b; }
+
+.pdf-saved .b { background: #f0f9ff; color: #0c4a6e; }
+
+.pdf-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 4px;
+}
+
+summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  list-style: none;
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::marker {
+  content: "";
+}
+
+summary::after {
+  content: "＋";
+  flex: none;
+  margin-left: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+details[open] > summary::after {
+  content: "－";
+  transform: rotate(180deg);
+}
+
+.fold-hint {
+  margin-left: auto;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+#comparison-body tr:nth-child(even) {
+  background: #f1f5f9;
+}
+
+#comparison-body tr.bg-emerald-50 {
+  background-color: #ecfdf5;
+}
+
+#comparison-body tr.bg-sky-50 {
+  background-color: #f0f9ff;
+}
+
+#comparison-body tr.bg-rose-50 {
+  background-color: #fff1f2;
+}
+
+#comparison-body td {
+  border-top: 1px solid #e2e8f0;
+  padding: 0.75rem 0.5rem;
+}
+
+#comparison-body td:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.interest-bar {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #e2e8f0;
+}
+
+.interest-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f172a;
+}
+
+#schedule-body tr.paid-row td {
+  background: #e0e7ff;
+  color: #334155;
+}
+
+.pdf-root .pdf-sheet {
+  padding: 16px 18px 14px;
+}
+
+.pdf-root .pdf-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #0f172a;
+}
+
+.pdf-root .pdf-top h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0f172a;
+}
+
+.pdf-root .pdf-kicker {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pdf-root .pdf-date {
+  flex: none;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.pdf-root .pdf-summary {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+}
+
+.pdf-root .pdf-stat span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.pdf-root .pdf-stat strong {
+  display: block;
+  margin-top: 1px;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-root .pdf-stat em {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.pdf-root .pdf-stat-lg strong {
+  font-size: 22px;
+}
+
+.pdf-root .pdf-stat-md {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pdf-root .pdf-stat-md strong {
+  font-size: 18px;
+}
+
+.pdf-root .pdf-stat-gap {
+  margin-top: 8px;
+}
+
+.pdf-root .pdf-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pdf-root .pdf-remain {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-root .pdf-summary .interest-bar {
+  margin-top: 6px;
+}
+
+.pdf-root .pdf-summary .pdf-caption {
+  margin-top: 6px;
+}
+
+.pdf-root .pdf-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pdf-root .pdf-kpi {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px 9px;
+  background: #f8fafc;
+}
+
+.pdf-root .pdf-kpi > span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.pdf-root .pdf-kpi strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.pdf-root .pdf-sub {
+  display: block;
+  margin-top: 3px;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.pdf-root .pdf-kpi .interest-bar {
+  margin-top: 6px;
+}
+
+.pdf-root .pdf-section {
+  margin-top: 12px;
+}
+
+.pdf-root .pdf-sheet h2 {
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.pdf-root .pdf-bar-row {
+  display: grid;
+  grid-template-columns: 148px 1fr 96px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.pdf-root .pdf-section .pdf-bar-row {
+  grid-template-columns: 168px minmax(0, 1fr) auto;
+}
+
+.pdf-root .pdf-bar-name {
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.pdf-root .pdf-section .pdf-bar-name {
+  white-space: nowrap;
+}
+
+.pdf-root .pdf-bar-name.is-best {
+  font-weight: 700;
+}
+
+.pdf-root .pdf-bar-track {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.pdf-root .pdf-bar-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.pdf-root .pdf-bar-value {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pdf-root .pdf-caption {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.pdf-root .pdf-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pdf-root .pdf-chart-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 6px 2px;
+}
+
+.pdf-root .pdf-chart-card h3 {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 650;
+  color: #334155;
+}
+
+.pdf-root .pdf-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+}
+
+.pdf-root .pdf-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pdf-root .pdf-split-one {
+  grid-template-columns: 1fr;
+}
+
+.pdf-root .pdf-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px 10px;
+}
+
+.pdf-root .pdf-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.pdf-root .pdf-mini-item span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.pdf-root .pdf-mini-item strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-root .pdf-foot {
+  margin: 10px 0 0;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.4;
+}

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>房贷还款策略</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-slate-900">
+  <main class="mx-auto w-full max-w-xl px-4 py-6 sm:py-10">
+    <header class="mb-5 flex items-center justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">房贷还款策略</h1>
+        <p class="mt-1 text-sm text-slate-500">对比提前还款、转贷与机会成本</p>
+      </div>
+      <span id="method-badge" class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">等额本息</span>
+    </header>
+
+    <form id="form" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" id="mode-single" class="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white">普通贷款</button>
+        <button type="button" id="mode-combo" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800">组合贷款</button>
+      </div>
+
+      <div>
+        <p class="text-sm font-medium text-slate-700">还款方式</p>
+        <div class="mt-1.5 grid grid-cols-2 gap-2">
+          <button type="button" id="method-installment" class="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white">等额本息</button>
+          <button type="button" id="method-principal" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800">等额本金</button>
+        </div>
+      </div>
+
+      <div id="single-fields" class="space-y-4">
+        <label class="block text-sm font-medium text-slate-700">
+          贷款总额（万元）
+          <input id="principal" name="principal" type="text" inputmode="decimal" placeholder="例如 100" autocomplete="off" required class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          年利率（%）
+          <input id="rate" name="rate" type="text" inputmode="decimal" placeholder="例如 3.5" autocomplete="off" required class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+      </div>
+
+      <section id="combo-fields" hidden class="space-y-4">
+        <div>
+          <h2 class="text-base font-semibold">组合贷款</h2>
+          <p class="mt-1 text-sm leading-relaxed text-slate-500">公积金和商贷分开填写年限。提前还款默认先还商贷。额外还款的剩余月数按两笔里较长的期限计算，包含当月。</p>
+        </div>
+        <label class="block text-sm font-medium text-slate-700">
+          公积金贷款金额（万元）
+          <input id="fund-principal" name="fund-principal" type="text" inputmode="decimal" placeholder="例如 40" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          公积金年利率（%）
+          <input id="fund-rate" name="fund-rate" type="text" inputmode="decimal" placeholder="例如 2.85" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          公积金年限
+          <input id="fund-years" name="fund-years" type="text" inputmode="numeric" placeholder="例如 30" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          商贷金额（万元）
+          <input id="commercial-principal" name="commercial-principal" type="text" inputmode="decimal" placeholder="例如 60" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          商贷年利率（%）
+          <input id="commercial-rate" name="commercial-rate" type="text" inputmode="decimal" placeholder="例如 3.5" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          商贷年限
+          <input id="commercial-years" name="commercial-years" type="text" inputmode="numeric" placeholder="例如 20" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <label class="block text-sm font-medium text-slate-700">
+          提前还款金额（万元，可选）
+          <input id="combo-prepay" name="combo-prepay" type="text" inputmode="decimal" placeholder="例如 10" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+      </section>
+      <label id="years-field" class="block text-sm font-medium text-slate-700">
+        贷款年限
+        <input id="years" name="years" type="text" inputmode="numeric" placeholder="例如 30" autocomplete="off" required class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+      </label>
+
+      <div class="grid grid-cols-2 gap-3">
+        <label class="block text-sm font-medium text-slate-700">
+          已还款期数
+          <input id="paid-months" name="paid-months" type="text" inputmode="numeric" placeholder="0" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+        </label>
+        <div>
+          <p class="text-sm font-medium text-slate-700">剩余还款期数</p>
+          <p id="remaining-months" class="mt-1.5 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-relaxed text-slate-900">填写年限后显示</p>
+        </div>
+      </div>
+
+      <details class="border-t border-slate-200 pt-4">
+        <summary class="text-base font-semibold">
+          额外还款
+          <span class="fold-hint">可选 · 支持多笔</span>
+        </summary>
+        <div class="mt-3 space-y-3">
+          <p class="text-sm leading-relaxed text-slate-500">填写提前还款时贷款还剩几个月，包含当月。这笔钱在当月月供之外直接冲抵本金。</p>
+          <div id="extra-list" class="space-y-3"></div>
+          <button type="button" id="add-extra" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 active:bg-slate-100">添加一条额外还款</button>
+        </div>
+      </details>
+
+      <details class="border-t border-slate-200 pt-4">
+        <summary class="text-base font-semibold">
+          机会成本对比
+          <span class="fold-hint">可选</span>
+        </summary>
+        <div class="mt-3 space-y-3">
+          <p class="text-sm leading-relaxed text-slate-500">同一笔闲钱会同时比较：提前还款缩短年限、提前还款减少月供，以及按月复利存到原贷款结束。两项都留空则不比较。</p>
+          <label class="block text-sm font-medium text-slate-700">
+            手头闲钱（万元）
+            <input id="spare" name="spare" type="text" inputmode="decimal" placeholder="例如 10" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+          </label>
+          <label class="block text-sm font-medium text-slate-700">
+            存款或理财年化利率（%）
+            <input id="deposit-rate" name="deposit-rate" type="text" inputmode="decimal" placeholder="例如 2" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+          </label>
+        </div>
+      </details>
+
+      <details class="border-t border-slate-200 pt-4">
+        <summary class="text-base font-semibold">
+          转贷分析
+          <span class="fold-hint">可选</span>
+        </summary>
+        <div class="mt-3 space-y-3">
+          <p class="text-sm leading-relaxed text-slate-500">还款期限不变，手续费一次性支付，不计入本金。组合贷款保留公积金，只把商贷换成新利率。年利率留空则不分析。</p>
+          <label class="block text-sm font-medium text-slate-700">
+            新贷款年利率（%）
+            <input id="refi-rate" name="refi-rate" type="text" inputmode="decimal" placeholder="例如 3.0" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+          </label>
+          <label class="block text-sm font-medium text-slate-700">
+            转贷手续费（万元，可选）
+            <input id="refi-fee" name="refi-fee" type="text" inputmode="decimal" placeholder="例如 0.5" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+          </label>
+        </div>
+      </details>
+
+      <button type="submit" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800">计算</button>
+    </form>
+
+    <p id="message" class="empty:hidden mt-3 text-sm text-rose-700" role="alert"></p>
+
+    <section id="result" hidden class="mt-4 space-y-3">
+      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p class="text-sm text-slate-500">每月月供</p>
+        <p id="payment" class="mt-1 text-4xl font-semibold tracking-tight tabular-nums"></p>
+        <div id="combo-breakdown" hidden class="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-4">
+          <div>
+            <p class="text-sm text-slate-500">公积金月供</p>
+            <p id="fund-payment" class="mt-1 text-xl font-semibold tabular-nums"></p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-500">商贷月供</p>
+            <p id="commercial-payment" class="mt-1 text-xl font-semibold tabular-nums"></p>
+          </div>
+        </div>
+        <p id="combo-extra" hidden class="mt-3 text-sm leading-relaxed text-slate-600"></p>
+        <p class="mt-4 border-t border-slate-200 pt-4 text-sm text-slate-500">总利息</p>
+        <p id="original-interest" class="mt-1 text-2xl font-semibold tabular-nums"></p>
+        <div id="interest-progress-wrap" hidden class="mt-3">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm text-slate-500">剩余利息 <span id="remaining-interest" class="font-semibold text-slate-900 tabular-nums"></span></p>
+            <p id="interest-percent" class="text-sm font-semibold tabular-nums text-slate-700"></p>
+          </div>
+          <div class="interest-bar mt-2" role="progressbar" aria-label="已还利息占比"><span id="interest-progress"></span></div>
+        </div>
+        <div id="interest-breakdown" hidden class="mt-4 grid grid-cols-2 gap-3">
+          <div>
+            <p class="text-sm text-slate-500">公积金总利息</p>
+            <p id="fund-interest" class="mt-1 text-xl font-semibold tabular-nums"></p>
+            <p id="fund-remaining-interest" class="empty:hidden mt-1 text-xs text-slate-500"></p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-500">商贷总利息</p>
+            <p id="commercial-interest" class="mt-1 text-xl font-semibold tabular-nums"></p>
+            <p id="commercial-remaining-interest" class="empty:hidden mt-1 text-xs text-slate-500"></p>
+          </div>
+        </div>
+      </article>
+
+      <section id="comparison" hidden class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-4 py-3">
+          <h3 class="text-base font-semibold">方案对比</h3>
+          <p class="mt-1 text-xs leading-relaxed text-slate-500">按净收益从高到低排列。转贷已扣除手续费。绿色最优，蓝色次优，红色不如原计划。</p>
+        </div>
+        <div class="overflow-x-hidden">
+          <table class="w-full table-fixed border-collapse text-sm">
+            <colgroup>
+              <col class="w-12">
+              <col class="w-[24%]">
+              <col>
+              <col class="w-[24%]">
+            </colgroup>
+            <thead>
+              <tr class="text-left text-xs text-slate-500">
+                <th class="px-2 py-2 font-medium">排名</th>
+                <th class="px-2 py-2 font-medium">方案</th>
+                <th class="px-2 py-2 font-medium">说明</th>
+                <th class="px-2 py-2 text-right font-medium">净收益</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <details class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <summary class="text-base font-semibold">趋势图表</summary>
+        <div class="mt-4 space-y-4">
+          <article>
+            <p class="text-sm font-medium text-slate-700">剩余本金</p>
+            <p id="chart-note" class="empty:hidden mt-1 text-sm text-rose-700"></p>
+            <div class="mt-2 h-60">
+              <canvas id="balance-chart" aria-label="原计划和提前还款后的剩余本金折线图"></canvas>
+            </div>
+          </article>
+          <article class="border-t border-slate-200 pt-4">
+            <p class="text-sm font-medium text-slate-700">剩余利息</p>
+            <p class="mt-1 text-xs text-slate-500">贷款开始时各方案剩余利息相同。提前还款的当月会直线下降，还清后为 0。</p>
+            <p id="interest-chart-note" class="empty:hidden mt-1 text-sm text-rose-700"></p>
+            <div class="mt-2 h-60">
+              <canvas id="interest-chart" aria-label="各策略剩余利息折线图"></canvas>
+            </div>
+          </article>
+        </div>
+      </details>
+
+      <details id="schedule-details" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <summary class="cursor-pointer text-base font-semibold">详细还款计划表</summary>
+        <div id="plan-switch" class="mt-3 flex flex-wrap gap-2"></div>
+        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span class="font-medium text-slate-700">导出计划</span>
+          <div id="export-plan-options" class="flex flex-wrap gap-x-4 gap-y-2"></div>
+          <button type="button" id="export-schedule" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 active:bg-slate-100">导出</button>
+        </div>
+        <p id="schedule-paid-note" class="empty:hidden mt-3 text-xs text-slate-500"></p>
+        <div class="mt-3 max-h-80 overflow-auto rounded-xl border border-slate-200">
+          <table class="w-full min-w-[26rem] border-collapse text-sm tabular-nums">
+            <thead>
+              <tr class="text-slate-500">
+                <th class="sticky top-0 bg-white px-3 py-2 text-left font-medium">月份</th>
+                <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">月供</th>
+                <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">本金</th>
+                <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">利息</th>
+                <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">剩余本金</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-body"></tbody>
+          </table>
+        </div>
+      </details>
+
+      <button type="button" id="export-pdf" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800 disabled:opacity-60">导出PDF报告</button>
+    </section>
+  </main>
+  <script src="mortgage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "mortgage-calculator",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/input.css -o ./styles.css --minify",
+    "build": "npm run build:css && node scripts/copy-dist.js"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}
