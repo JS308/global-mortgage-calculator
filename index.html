@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>房贷还款策略</title>
+  <title>房贷提前还款计算器 - 缩短年限与减少月供对比工具</title>
+  <meta name="description" content="免费的房贷提前还款策略模拟器。支持商贷公积金组合贷，精准对比缩短年限与减少月供的利息差额。提供转贷分析及存款理财机会成本对比，一键导出PDF报告。">
+  <meta name="keywords" content="提前还款,房贷计算器,缩短年限,减少月供,商贷转公积金,组合贷,提前还贷划算吗,存贷利率对比,机会成本">
   <link rel="stylesheet" href="styles.css">
   <script>
   var _hmt = _hmt || [];
@@ -142,8 +144,8 @@
             <input id="refi-rate" name="refi-rate" type="text" inputmode="decimal" placeholder="例如 3.0" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
           </label>
           <label class="block text-sm font-medium text-slate-700">
-            转贷手续费（万元，可选）
-            <input id="refi-fee" name="refi-fee" type="text" inputmode="decimal" placeholder="例如 0.5" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            转贷手续费（元，可选）
+            <input id="refi-fee" name="refi-fee" type="text" inputmode="decimal" placeholder="例如 1000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
           </label>
         </div>
       </details>
@@ -251,7 +253,7 @@
           <table class="w-full min-w-[26rem] border-collapse text-sm tabular-nums">
             <thead>
               <tr class="text-slate-500">
-                <th class="sticky top-0 bg-white px-3 py-2 text-left font-medium">月份</th>
+                <th class="sticky top-0 bg-white px-3 py-2 text-left font-medium">期数</th>
                 <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">月供</th>
                 <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">本金</th>
                 <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">利息</th>

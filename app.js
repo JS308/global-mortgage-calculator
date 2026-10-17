@@ -641,7 +641,7 @@ function readRefinance() {
   if (rateRaw === "" && feeRaw === "") return null;
   if (rateRaw === "") throw new Error("转贷分析需要填写新贷款年利率");
   const ratePercent = Number(rateRaw);
-  const fee = feeRaw === "" ? 0 : wanToYuan(Number(feeRaw.replace(/,/g, "")));
+  const fee = feeRaw === "" ? 0 : roundMoney(Number(feeRaw.replace(/,/g, "")));
   if (!Number.isFinite(ratePercent) || ratePercent < 0) {
     throw new Error("新贷款年利率必须是大于等于 0 的数字");
   }
@@ -1228,7 +1228,7 @@ function renderExportOptions() {
 }
 
 function buildCsv(plan) {
-  const lines = ["月份,月供,本金,利息,剩余本金"];
+  const lines = ["期数,月供,本金,利息,剩余本金"];
   displaySchedule(plan).forEach((row) => {
     lines.push([
       row.月份,
