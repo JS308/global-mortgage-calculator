@@ -115,6 +115,9 @@ form.addEventListener("submit", (event) => {
     const planExtras = extras.slice();
     if (singlePrepay > 0) planExtras.push({ 月份: 1, 金额: singlePrepay });
     const original = runSchedule(repayMethod, "shorten", principal, rate, years, null, paid, arm);
+    const heldRate = arm
+      ? runSchedule(repayMethod, "shorten", principal, rate, years, null, paid, null)
+      : null;
     const originalInterest = sumInterest(original);
     const originalPayment = original[0].月供;
     const interestSummary = buildInterestSummary({ original, principal, rate, years, paid, arm });
@@ -122,6 +125,7 @@ form.addEventListener("submit", (event) => {
 
     payment.textContent = formatMoney(monthlyHousing);
     renderHousing(originalPayment, housing);
+    renderArmNote(original, arm, paid);
     renderInterestSplit(interestSummary);
 
     let shortened = null;
@@ -151,6 +155,9 @@ form.addEventListener("submit", (event) => {
       refinance,
       biweekly,
       methodLabel: repayMethod === "principal" ? "Equal principal" : "Fixed payment",
+      arm,
+      heldRate,
+      paid,
     });
     renderComparison(comparisonRows);
     result.hidden = false;
@@ -162,6 +169,7 @@ form.addEventListener("submit", (event) => {
       opportunity,
       refinance,
       biweekly,
+      heldRate,
     }));
     latestReport = {
       principal,
@@ -292,6 +300,26 @@ function renderHousing(principalAndInterest, housing) {
   document.getElementById("insurance-payment").textContent = formatMoney(housing.insuranceMonthly);
 }
 
+function renderArmNote(schedule, arm, paid) {
+  const note = document.getElementById("pi-note");
+  if (!arm) {
+    note.hidden = true;
+    note.textContent = "";
+    return;
+  }
+  const later = paymentAfterAdjustment(schedule, arm.fixedYears, paid);
+  note.hidden = false;
+  note.textContent = later == null
+    ? "This schedule is paid off before the rate adjusts."
+    : "After " + arm.fixedYears + " years the rate becomes " + roundMoney(arm.adjustedRate * 100) + "% and principal and interest becomes " + formatMoney(later) + ".";
+}
+
+function paymentAfterAdjustment(schedule, fixedYears, paid) {
+  const index = fixedYears * 12 - (paid || 0);
+  if (index <= 0 || index >= schedule.length) return null;
+  return schedule[index].月供;
+}
+
 function renderBiweekly(result) {
   const box = document.getElementById("biweekly-box");
   if (!result) {
@@ -420,7 +448,7 @@ function readExtras(years, paid) {
   let index = 0;
   extraList.querySelectorAll(".extra-row").forEach((row) => {
     const periodRaw = row.querySelector(".extra-remaining").value.trim();
-    const amountRaw = row.querySelector(".extra-amount").value.trim().replace(/,/g, "");
+    const amountRaw = row.querySelector(".extra-amount").value.trim();
     if (periodRaw === "" && amountRaw === "") return;
     index += 1;
     const period = Number(periodRaw);
@@ -428,7 +456,7 @@ function readExtras(years, paid) {
     if (!Number.isInteger(period) || period < firstPeriod || period > totalMonths) {
       throw new Error("Extra payment " + index + " must fall between payment " + firstPeriod + " and " + totalMonths);
     }
-    const amount = Number(amountRaw);
+    const amount = parseAmount(amountRaw);
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error("Extra payment " + index + " amount must be greater than 0");
     }
@@ -447,7 +475,7 @@ function readOpportunity() {
   if (cashRaw === "" || rateRaw === "") {
     throw new Error("Opportunity cost needs both the cash amount and the APY");
   }
-  const cash = roundMoney(Number(cashRaw.replace(/,/g, "")));
+  const cash = roundMoney(parseAmount(cashRaw));
   const ratePercent = Number(rateRaw);
   if (!Number.isFinite(cash) || cash <= 0) {
     throw new Error("Cash on hand must be a number greater than 0");
@@ -471,7 +499,7 @@ function readRefinance() {
   if (rateRaw === "" && feeRaw === "") return null;
   if (rateRaw === "") throw new Error("Enter the new interest rate to compare a refinance");
   const ratePercent = Number(rateRaw);
-  const fee = feeRaw === "" ? 0 : roundMoney(Number(feeRaw.replace(/,/g, "")));
+  const fee = feeRaw === "" ? 0 : roundMoney(parseAmount(feeRaw));
   if (!Number.isFinite(ratePercent) || ratePercent < 0) {
     throw new Error("Refinance rate must be a number greater than or equal to 0");
   }
@@ -489,12 +517,29 @@ function formatPayback(result) {
 
 function buildComparisonRows(input) {
   const totalMonths = input.original.length;
+  const adjustedPayment = input.arm
+    ? paymentAfterAdjustment(input.original, input.arm.fixedYears, input.paid)
+    : null;
   const rows = [{
     name: "Original plan",
-    note: input.methodLabel + ", full remaining term of " + formatTerm(totalMonths),
+    note: input.arm
+      ? [
+        input.methodLabel + ", full remaining term of " + formatTerm(totalMonths),
+        "Rate becomes " + roundMoney(input.arm.adjustedRate * 100) + "% after " + input.arm.fixedYears + " years",
+        armPaymentNote(input.originalPayment, adjustedPayment),
+      ].join("\n")
+      : input.methodLabel + ", full remaining term of " + formatTerm(totalMonths),
     benefit: 0,
     order: 50,
   }];
+  if (input.arm && input.heldRate) {
+    rows.push({
+      name: "Initial rate for the full term",
+      note: "Keeps the starting rate and " + formatMoney(input.heldRate[0].月供) + " for the whole term",
+      benefit: roundMoney(input.originalInterest - sumInterest(input.heldRate)),
+      order: 45,
+    });
+  }
   if (input.shortened) {
     rows.push({
       name: "Extra principal, shorter term",
@@ -595,6 +640,14 @@ function shortenNote(total, end) {
   return "Pays off " + months + " months sooner";
 }
 
+function armPaymentNote(before, after) {
+  if (after == null) return "Paid off before the rate adjusts";
+  const delta = roundMoney(after - before);
+  if (delta > 0) return "Payment rises from " + formatMoney(before) + " to " + formatMoney(after);
+  if (delta < 0) return "Payment falls from " + formatMoney(before) + " to " + formatMoney(after);
+  return "Payment stays " + formatMoney(before) + " after the rate adjusts";
+}
+
 function paymentChangeNote(before, after) {
   const drop = roundMoney(before - after);
   if (drop > 0) return "Payment drops by " + formatMoney(drop);
@@ -661,10 +714,26 @@ function sumInterest(schedule) {
   return roundMoney(schedule.reduce((sum, row) => sum + row.利息部分, 0));
 }
 
+function parseAmount(raw) {
+  let text = String(raw == null ? "" : raw).trim().replace(/[\s\u00a0\u202f$]/g, "").replace(/，/g, ",");
+  if (text === "") return NaN;
+  const comma = text.lastIndexOf(",");
+  const dot = text.lastIndexOf(".");
+  if (comma !== -1 && dot !== -1) {
+    text = comma > dot ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
+  } else if (comma !== -1) {
+    const parts = text.split(",");
+    text = parts.slice(1).every((part) => /^\d{3}$/.test(part))
+      ? parts.join("")
+      : parts[0] + "." + parts.slice(1).join("");
+  }
+  if (!/^\d+(\.\d+)?$/.test(text)) return NaN;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : NaN;
+}
+
 function readNumber(id) {
-  const raw = document.getElementById(id).value.trim().replace(/,/g, "");
-  if (raw === "") return NaN;
-  return Number(raw);
+  return parseAmount(document.getElementById(id).value);
 }
 
 function readDollar(id) {
@@ -676,7 +745,7 @@ function readDollar(id) {
 function readOptionalMoney(id, label) {
   const raw = document.getElementById(id).value.trim();
   if (raw === "") return 0;
-  const value = Number(raw.replace(/,/g, ""));
+  const value = parseAmount(raw);
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(label + " must be a number greater than or equal to 0");
   }
@@ -692,39 +761,39 @@ function formatMoney(amount) {
 }
 
 function formatAmountInput(value) {
-  const cleaned = value.replace(/,/g, "").replace(/[^\d.]/g, "");
-  if (cleaned === "") return "";
-  const dot = cleaned.indexOf(".");
-  let intPart = dot === -1 ? cleaned : cleaned.slice(0, dot);
-  const hasDot = dot !== -1;
-  const fraction = hasDot ? cleaned.slice(dot + 1).replace(/\./g, "").slice(0, 4) : "";
-  intPart = intPart.replace(/^0+(?=\d)/, "");
-  if (intPart === "") intPart = "0";
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return hasDot ? grouped + "." + fraction : grouped;
+  const amount = parseAmount(String(value).replace(/[.,]+$/, ""));
+  if (!Number.isFinite(amount)) return "";
+  const cents = Math.round(amount * 100);
+  const whole = Math.floor(cents / 100);
+  const frac = cents % 100;
+  const grouped = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return frac === 0 ? grouped : grouped + "." + String(frac).padStart(2, "0");
 }
 
 function bindAmountInput(input) {
   input.addEventListener("input", () => {
-    const start = input.selectionStart == null ? input.value.length : input.selectionStart;
-    const logicalBefore = input.value.slice(0, start).replace(/,/g, "").length;
-    const formatted = formatAmountInput(input.value);
-    input.value = formatted;
-    let seen = 0;
-    let pos = 0;
-    while (pos < formatted.length && seen < logicalBefore) {
-      if (formatted[pos] !== ",") seen += 1;
-      pos += 1;
-    }
-    input.setSelectionRange(pos, pos);
+    const raw = input.value;
+    const cleaned = raw.replace(/[^\d,.]/g, "");
+    if (cleaned === raw) return;
+    const pos = input.selectionStart == null ? cleaned.length : input.selectionStart;
+    const removedBefore = raw.slice(0, pos).length - raw.slice(0, pos).replace(/[^\d,.]/g, "").length;
+    input.value = cleaned;
+    const next = Math.max(0, pos - removedBefore);
+    input.setSelectionRange(next, next);
   });
   input.addEventListener("blur", () => {
-    input.value = formatAmountInput(input.value.replace(/\.$/, ""));
+    if (input.value.trim() === "") return;
+    input.value = formatAmountInput(input.value);
   });
 }
 
 function chartPlans(input) {
-  const plans = [{ id: "original", name: "Original plan", schedule: input.original, color: "#64748b" }];
+  const plans = [{
+    id: "original",
+    name: input.heldRate ? "ARM after adjustment" : "Original plan",
+    schedule: input.original,
+    color: "#64748b",
+  }];
   const add = (id, name, schedule, color) => {
     if (schedule && schedule.length) plans.push({ id, name, schedule, color });
   };
@@ -734,13 +803,15 @@ function chartPlans(input) {
   add("spare-shorten", "Cash toward a shorter term", input.opportunity && input.opportunity.缩短计划, "#ea580c");
   add("spare-reduce", "Cash toward a lower payment", input.opportunity && input.opportunity.减供计划, "#9333ea");
   add("refinance", "Refinance", input.refinance && input.refinance.计划, "#0891b2");
+  add("arm-initial", "Initial rate for the full term", input.heldRate, "#0f766e");
   return plans;
 }
 
 function showPlans(principal, plans) {
   viewPlans = plans;
   if (!viewPlans.some((plan) => plan.id === activePlanId)) {
-    activePlanId = viewPlans.length > 1 ? viewPlans[1].id : "original";
+    const preferred = viewPlans.find((plan) => plan.id !== "original" && plan.id !== "arm-initial");
+    activePlanId = preferred ? preferred.id : "original";
   }
   renderChart(roundMoney(principal));
   renderPlanSwitch();

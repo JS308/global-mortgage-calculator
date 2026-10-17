@@ -167,6 +167,7 @@
           <div>
             <p class="text-sm text-slate-500">Principal &amp; interest</p>
             <p id="pi-payment" class="mt-1 text-xl font-semibold tabular-nums"></p>
+            <p id="pi-note" hidden class="mt-1 text-sm leading-relaxed text-slate-600"></p>
           </div>
           <div>
             <p class="text-sm text-slate-500">PMI</p>
@@ -235,7 +236,7 @@
           </article>
           <article class="border-t border-slate-200 pt-4">
             <p class="text-sm font-medium text-slate-700">Remaining interest</p>
-            <p class="mt-1 text-xs text-slate-500">Every strategy starts with the same remaining interest. An extra principal payment makes that month drop in a straight line. The balance is zero once the loan is paid off.</p>
+            <p class="mt-1 text-xs text-slate-500">Lines start from the original plan's remaining interest, then drop by the interest they save. For an ARM, the initial-rate line is the same loan with no rate change. An extra principal payment makes that month drop in a straight line. The balance is zero once the loan is paid off.</p>
             <p id="interest-chart-note" class="empty:hidden mt-1 text-sm text-rose-700"></p>
             <div class="mt-2 h-60">
               <canvas id="interest-chart" aria-label="Line chart of remaining interest for each strategy"></canvas>

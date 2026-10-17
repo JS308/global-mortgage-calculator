@@ -17,23 +17,15 @@ function calcEqualInstallment(principal, annualRate, years, extraPayments, elaps
   let balance = opened.balance;
 
   for (let month = opened.startMonth; month <= months && balance > 0; month++) {
-    const interest = roundMoney(balance * monthlyRate);
-    const regularCoversAll = roundMoney(balance + interest) <= monthlyPayment;
-    let principalPart;
-    let payment;
+    const step = amortizeInstallment(balance, monthlyRate, monthlyPayment, month === months);
+    let principalPart = step.principal;
+    let payment = step.payment;
+    const interest = step.interest;
+    balance = step.balance;
 
-    if (month === months || regularCoversAll) {
-      principalPart = balance;
-      payment = roundMoney(principalPart + interest);
-      balance = 0;
-    } else {
-      principalPart = roundMoney(monthlyPayment - interest);
-      payment = monthlyPayment;
-      balance = roundMoney(balance - principalPart);
-      if (balance < 0) balance = 0;
-
+    if (balance > 0) {
       const extra = extras.get(month) || 0;
-      if (extra > 0 && balance > 0) {
+      if (extra > 0) {
         const applied = roundMoney(Math.min(extra, balance));
         principalPart = roundMoney(principalPart + applied);
         payment = roundMoney(payment + applied);
@@ -67,23 +59,15 @@ function calcReducedPayment(principal, annualRate, years, extraPayments, elapsed
   let balance = opened.balance;
 
   for (let month = opened.startMonth; month <= months && balance > 0; month++) {
-    const interest = roundMoney(balance * monthlyRate);
-    const regularCoversAll = roundMoney(balance + interest) <= monthlyPayment;
-    let principalPart;
-    let payment;
+    const step = amortizeInstallment(balance, monthlyRate, monthlyPayment, month === months);
+    let principalPart = step.principal;
+    let payment = step.payment;
+    const interest = step.interest;
+    balance = step.balance;
 
-    if (month === months || regularCoversAll) {
-      principalPart = balance;
-      payment = roundMoney(principalPart + interest);
-      balance = 0;
-    } else {
-      principalPart = roundMoney(monthlyPayment - interest);
-      payment = monthlyPayment;
-      balance = roundMoney(balance - principalPart);
-      if (balance < 0) balance = 0;
-
+    if (balance > 0) {
       const extra = extras.get(month) || 0;
-      if (extra > 0 && balance > 0) {
+      if (extra > 0) {
         const applied = roundMoney(Math.min(extra, balance));
         principalPart = roundMoney(principalPart + applied);
         payment = roundMoney(payment + applied);
@@ -414,7 +398,7 @@ function calcRefinance(principal, oldRate, years, newRate, fee, method, elapsed,
   const original = runSchedule(method, "shorten", principal, oldRate, years, null, paid, arm);
   const balance = currentBalance(principal, oldRate, years, paid, method, arm);
   const refinanced = paid === 0
-    ? base(principal, newRate, years)
+    ? amortize(method).base(principal, newRate, years)
     : calcFresh(method, balance, newRate, years * 12 - paid);
   const originalInterest = roundMoney(original.reduce((sum, row) => sum + row.利息部分, 0));
   const newInterest = roundMoney(refinanced.reduce((sum, row) => sum + row.利息部分, 0));
@@ -537,9 +521,11 @@ function simulateArm(principal, annualRate, years, extraPayments, elapsed, metho
 
 /**
  * Bi-weekly plan: half of the current principal-and-interest payment, 26 times a year.
- * Interest compounds each period at the annual rate divided by 26.
+ * Each period compounds at annualRate / 26. An ARM recasts that half-payment once,
+ * after exactly 26 periods for every year of the remaining fixed period.
  */
 function calcBiweekly(principal, annualRate, years, elapsed, method, arm) {
+  const periodsPerYear = 26;
   const months = years * 12;
   const paid = normalizeElapsed(elapsed, months);
   const balance = currentBalance(principal, annualRate, years, paid, method, arm);
@@ -560,9 +546,9 @@ function calcBiweekly(principal, annualRate, years, elapsed, method, arm) {
   let interestTotal = 0;
   let periods = 0;
   const fixedMonthsLeft = arm ? Math.max(0, arm.fixedYears * 12 - paid) : remainingMonths;
-  const switchAfter = arm ? Math.round(fixedMonthsLeft * 26 / 12) : Infinity;
+  const switchAfter = arm ? Math.round(fixedMonthsLeft * periodsPerYear / 12) : Infinity;
   const buckets = new Map();
-  const maxPeriods = Math.max(remainingMonths * 4, 1);
+  const maxPeriods = Math.max(Math.ceil(remainingMonths * periodsPerYear / 12) * 2, periodsPerYear);
 
   while (bal > 0) {
     periods += 1;
@@ -570,37 +556,32 @@ function calcBiweekly(principal, annualRate, years, elapsed, method, arm) {
       throw new Error("Bi-weekly payment does not cover the interest, so the balance never pays off");
     }
     if (arm && switchAfter < Infinity && periods === switchAfter + 1 && bal > 0) {
-      const elapsedMonths = Math.min(remainingMonths - 1, Math.round(switchAfter * 12 / 26));
+      const elapsedMonths = Math.min(remainingMonths - 1, Math.round(switchAfter * 12 / periodsPerYear));
       const left = Math.max(1, remainingMonths - elapsedMonths);
       const recast = method === "principal"
         ? roundMoney(principalInstallment(bal, left) + roundMoney(bal * arm.adjustedRate / 12))
         : calcMonthlyPayment(bal, arm.adjustedRate / 12, left);
       payment = roundMoney(recast / 2);
+      if (payment <= 0) throw new Error("Bi-weekly payment must be greater than 0");
     }
-    const rate = arm && periods > switchAfter ? arm.adjustedRate / 26 : activeRate / 26;
-    const interest = roundMoney(bal * rate);
-    if (payment <= interest && roundMoney(bal + interest) > payment) {
-      throw new Error("Bi-weekly payment does not cover the interest");
+    const annual = arm && periods > switchAfter ? arm.adjustedRate : activeRate;
+    const step = amortizeInstallment(bal, annual / periodsPerYear, payment, false);
+    if (step.balance >= bal) {
+      throw new Error("Bi-weekly payment does not cover the interest, so the balance never pays off");
     }
-    let principalPart;
-    let paidAmount;
-    if (roundMoney(bal + interest) <= payment) {
-      principalPart = bal;
-      paidAmount = roundMoney(bal + interest);
-      bal = 0;
-    } else {
-      principalPart = roundMoney(payment - interest);
-      paidAmount = payment;
-      bal = roundMoney(bal - principalPart);
-    }
-    interestTotal = roundMoney(interestTotal + interest);
-    const month = Math.max(1, Math.ceil(periods * 12 / 26));
+    bal = step.balance;
+    interestTotal = roundMoney(interestTotal + step.interest);
+    const month = Math.max(1, Math.ceil(periods * 12 / periodsPerYear));
     const bucket = buckets.get(month) || { 月份: month, 月供: 0, 本金部分: 0, 利息部分: 0, 剩余本金: bal };
-    bucket.月供 = roundMoney(bucket.月供 + paidAmount);
-    bucket.本金部分 = roundMoney(bucket.本金部分 + principalPart);
-    bucket.利息部分 = roundMoney(bucket.利息部分 + interest);
+    bucket.月供 = roundMoney(bucket.月供 + step.payment);
+    bucket.本金部分 = roundMoney(bucket.本金部分 + step.principal);
+    bucket.利息部分 = roundMoney(bucket.利息部分 + step.interest);
     bucket.剩余本金 = bal;
     buckets.set(month, bucket);
+  }
+
+  if (interestTotal > roundMoney(Math.max(balance, 1) * 30)) {
+    throw new Error("Bi-weekly interest is not a plausible result for this loan");
   }
 
   const schedule = [...buckets.values()].sort((a, b) => a.月份 - b.月份);
@@ -617,13 +598,41 @@ function calcBiweekly(principal, annualRate, years, elapsed, method, arm) {
   };
 }
 
-
-function paySlice(balance, monthlyRate, scheduled, forcePayoff, method) {
+/**
+ * One installment period. Interest is balance times the periodic rate, rounded to cents.
+ * Principal is the rest of the payment. If cent rounding would freeze or raise the balance,
+ * one cent of principal is paid so the loan still amortizes.
+ */
+function amortizeInstallment(balance, periodicRate, scheduled, forcePayoff) {
   if (balance <= 0) {
     return { payment: 0, principal: 0, interest: 0, balance: 0 };
   }
-  const interest = roundMoney(balance * monthlyRate);
+  let interest = roundMoney(balance * periodicRate);
+  const payoff = roundMoney(balance + interest);
+  if (forcePayoff || payoff <= scheduled) {
+    return { payment: payoff, principal: balance, interest, balance: 0 };
+  }
+  let principalPart = roundMoney(scheduled - interest);
+  let payment = scheduled;
+  if (principalPart < 0.01) {
+    principalPart = Math.min(balance, 0.01);
+    payment = roundMoney(interest + principalPart);
+    interest = roundMoney(payment - principalPart);
+  }
+  return {
+    payment,
+    principal: principalPart,
+    interest,
+    balance: roundMoney(Math.max(0, balance - principalPart)),
+  };
+}
+
+function paySlice(balance, monthlyRate, scheduled, forcePayoff, method) {
   if (method === "principal") {
+    if (balance <= 0) {
+      return { payment: 0, principal: 0, interest: 0, balance: 0 };
+    }
+    const interest = roundMoney(balance * monthlyRate);
     const principalPart = forcePayoff || balance <= scheduled ? balance : scheduled;
     let next = roundMoney(balance - principalPart);
     if (next < 0) next = 0;
@@ -634,19 +643,7 @@ function paySlice(balance, monthlyRate, scheduled, forcePayoff, method) {
       balance: next,
     };
   }
-  const covers = roundMoney(balance + interest) <= scheduled;
-  if (forcePayoff || covers) {
-    return {
-      payment: roundMoney(balance + interest),
-      principal: balance,
-      interest,
-      balance: 0,
-    };
-  }
-  const principalPart = roundMoney(scheduled - interest);
-  let next = roundMoney(balance - principalPart);
-  if (next < 0) next = 0;
-  return { payment: scheduled, principal: principalPart, interest, balance: next };
+  return amortizeInstallment(balance, monthlyRate, scheduled, forcePayoff);
 }
 
 if (typeof module !== "undefined" && module.exports) {
