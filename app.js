@@ -105,6 +105,7 @@ const methodPrincipalButton = document.getElementById("method-principal");
 const methodBadge = document.getElementById("method-badge");
 let repayMethod = "installment";
 let paidMonthsShown = 0;
+let loanTermMonths = 0;
 let paidHistory = [];
 let loanStart = null;
 fillAnnualYearOptions();
@@ -200,9 +201,12 @@ form.addEventListener("submit", (event) => {
       depositRatePercent: opportunityInput ? opportunityInput.ratePercent : null,
     };
     const comparisonRows = buildComparisonRows(comparisonInput);
+    loanTermMonths = years * 12;
     const advice = buildAdvice(comparisonInput);
     renderComparison(comparisonRows, advice);
     result.hidden = false;
+    document.getElementById("charts-details").open = true;
+    document.getElementById("schedule-details").open = true;
     const chartInput = {
       original,
       shortened,
@@ -1047,6 +1051,16 @@ function shortenAdvice(best) {
   return "Choose “pay extra and shorten the term.” You save " + formatSpeechMoney(best.benefit) + " in interest.";
 }
 
+function prepayTimingAdvice() {
+  const marker = prepayInflection();
+  if (!marker || !marker.points.length) return "";
+  const when = marker.points[0].full;
+  if (marker.paid < marker.points[0].month) {
+    return "Paying extra before " + when + " gives you more for your money.";
+  }
+  return "The better-value window was before " + when + ". Extra payments save less interest now.";
+}
+
 function renderComparison(rows, advice) {
   comparisonBody.replaceChildren();
   const card = document.getElementById("advice-card");
@@ -1056,9 +1070,13 @@ function renderComparison(rows, advice) {
     card.textContent = "";
     return;
   }
-  if (advice && advice.text) {
+  const parts = [];
+  if (advice && advice.text) parts.push(advice.text);
+  const timing = prepayTimingAdvice();
+  if (timing) parts.push(timing);
+  if (parts.length) {
     card.hidden = false;
-    card.textContent = "💡 " + advice.text;
+    card.textContent = "💡 " + parts.join(" ");
   } else {
     card.hidden = true;
     card.textContent = "";
@@ -1285,6 +1303,7 @@ function clearVisualization() {
   viewPlans = [];
   chartToken += 1;
   paidMonthsShown = 0;
+  loanTermMonths = 0;
   paidHistory = [];
   scheduleBody.replaceChildren();
   planSwitch.replaceChildren();
@@ -1293,6 +1312,10 @@ function clearVisualization() {
   document.getElementById("interest-progress-wrap").hidden = true;
   chartNote.textContent = "";
   interestChartNote.textContent = "";
+  const inflectionNote = document.getElementById("interest-inflection");
+  inflectionNote.hidden = true;
+  inflectionNote.textContent = "";
+  inflectionNote.className = "interest-inflection";
   balanceChart = destroyChart(balanceChart);
   interestChart = destroyChart(interestChart);
 }
@@ -1338,12 +1361,16 @@ function remainingInterestSeries(schedule) {
 }
 
 function lineDatasets(valuesForPlan) {
-  return viewPlans.map((plan) => ({
+  const shown = new Set(["original"]);
+  if (activePlanId) shown.add(activePlanId);
+  const plans = viewPlans.filter((plan) => shown.has(plan.id));
+  const drawn = plans.length ? plans : viewPlans.slice(0, 1);
+  return drawn.map((plan) => ({
     label: plan.name,
     data: valuesForPlan(plan),
     borderColor: plan.color,
     backgroundColor: plan.color,
-    borderWidth: 2,
+    borderWidth: plan.id === activePlanId && plan.id !== "original" ? 3 : 2,
     pointRadius: 0,
     tension: 0,
   }));
@@ -1405,7 +1432,7 @@ function moneyTick(value) {
   return sign + "$" + Math.round(Math.abs(value)).toLocaleString("en-US");
 }
 
-function lineChartOptions(staticImage, compact) {
+function lineChartOptions(staticImage, compact, marker) {
   const tickFont = compact ? { size: 9 } : undefined;
   return {
     responsive: true,
@@ -1424,6 +1451,7 @@ function lineChartOptions(staticImage, compact) {
         },
       },
       tooltip: { enabled: !staticImage },
+      ...(marker && marker.points ? { prepayInflection: { points: marker.points, compact: !!compact } } : {}),
     },
     scales: {
       x: {
@@ -1444,6 +1472,148 @@ function lineChartOptions(staticImage, compact) {
   };
 }
 
+function paymentWhen(absoluteNumber) {
+  const index = paymentMonthIndex(absoluteNumber, paidMonthsShown);
+  const year = Math.floor(index / 12);
+  const month = index % 12 + 1;
+  return {
+    monthNumber: absoluteNumber,
+    label: monthName(month).slice(0, 3) + " " + year,
+    full: monthName(month) + " " + year,
+  };
+}
+
+function prepayInflection() {
+  const total = loanTermMonths;
+  if (!Number.isInteger(total) || total <= 0) return null;
+  const firstFraction = repayMethod === "principal" ? 0.25 : 1 / 3;
+  const at = (fraction) => Math.min(total, Math.max(1, Math.round(total * fraction)));
+  let first = at(firstFraction);
+  let second = at(0.5);
+  if (second <= first && first < total) second = first + 1;
+  const marks = second === first ? [first] : [first, second];
+  return {
+    paid: paidMonthsShown,
+    total,
+    points: marks.map((month) => Object.assign({ month }, paymentWhen(month))),
+  };
+}
+
+function inflectionZone(marker) {
+  const first = marker.points[0];
+  const second = marker.points[1];
+  if (marker.paid < first.month) return "early";
+  if (second && marker.paid < second.month) return "mid";
+  return "late";
+}
+
+function inflectionLines(marker) {
+  const first = marker.points[0];
+  const second = marker.points[1];
+  const when = second
+    ? "Best prepay point: " + first.full + ". Second point: " + second.full + "."
+    : "Best prepay point: " + first.full + ".";
+  if (inflectionZone(marker) === "early") {
+    return { headline: "This is the best time to pay extra.", when };
+  }
+  if (inflectionZone(marker) === "mid") {
+    return { headline: first.full + " has passed, so extra payments save less interest.", when };
+  }
+  const passed = second ? second.full : first.full;
+  return {
+    headline: passed + " has passed. Extra payments save limited interest now.",
+    when,
+  };
+}
+
+function inflectionConclusion(marker) {
+  const lines = inflectionLines(marker);
+  return lines.headline + " " + lines.when;
+}
+
+function updateInterestInflection() {
+  const note = document.getElementById("interest-inflection");
+  const marker = prepayInflection();
+  if (!marker) {
+    note.hidden = true;
+    note.textContent = "";
+    note.className = "interest-inflection";
+    return null;
+  }
+  const lines = inflectionLines(marker);
+  note.hidden = false;
+  note.className = "interest-inflection is-" + inflectionZone(marker);
+  note.replaceChildren();
+  note.append(pdfEl("strong", "", lines.headline), pdfEl("span", "", lines.when));
+  return marker;
+}
+
+function traceRoundRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+const prepayInflectionPlugin = {
+  id: "prepayInflection",
+  afterDraw(chart) {
+    const options = chart.options.plugins && chart.options.plugins.prepayInflection;
+    const points = options && options.points;
+    if (!points || !points.length) return;
+    const area = chart.chartArea;
+    const scale = chart.scales.x;
+    if (!area || !scale) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+    ctx.clip();
+    const fontSize = options.compact ? 9 : 11;
+    ctx.font = "600 " + fontSize + "px " + (Chart.defaults.font.family || "sans-serif");
+    const lineHeight = fontSize + 3;
+    const padX = 6;
+    const padY = 4;
+    points.forEach((point, index) => {
+      const x = scale.getPixelForValue(point.month);
+      if (!Number.isFinite(x) || x < area.left || x > area.right) return;
+      const color = index === 0 ? "#b45309" : "#1d4ed8";
+      ctx.beginPath();
+      ctx.setLineDash(index === 0 ? [5, 4] : [2, 4]);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(x, area.top);
+      ctx.lineTo(x, area.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const text = index === 0
+        ? "Best prepay point (" + point.label + ")"
+        : "Second point (" + point.label + ")";
+      const boxWidth = ctx.measureText(text).width + padX * 2;
+      const boxHeight = lineHeight + padY * 2;
+      let boxX = x + 8;
+      if (boxX + boxWidth > area.right - 4) boxX = x - boxWidth - 8;
+      boxX = Math.max(area.left + 4, Math.min(boxX, area.right - boxWidth - 4));
+      const boxY = area.top + 6 + index * (boxHeight + 6);
+      if (boxY + boxHeight > area.bottom - 4) return;
+      traceRoundRect(ctx, boxX, boxY, boxWidth, boxHeight, 6);
+      ctx.fillStyle = index === 0 ? "rgba(255, 251, 235, 0.94)" : "rgba(239, 246, 255, 0.94)";
+      ctx.fill();
+      ctx.strokeStyle = index === 0 ? "#f59e0b" : "#60a5fa";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.textBaseline = "top";
+      ctx.fillText(text, boxX + padX, boxY + padY);
+    });
+    ctx.restore();
+  },
+};
+
 function applyChartFont() {
   if (typeof Chart === "undefined") return;
   Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
@@ -1453,6 +1623,7 @@ async function renderChart(startingBalance) {
   const token = ++chartToken;
   chartNote.textContent = "";
   interestChartNote.textContent = "";
+  const marker = updateInterestInflection();
   balanceChart = destroyChart(balanceChart);
   interestChart = destroyChart(interestChart);
   try {
@@ -1485,7 +1656,13 @@ async function renderChart(startingBalance) {
     data: {
       datasets: lineDatasets((plan) => interestChartPoints(plan)),
     },
-    options: lineChartOptions(false),
+    options: lineChartOptions(false, false, marker),
+    plugins: [prepayInflectionPlugin],
+  });
+  requestAnimationFrame(() => {
+    if (token !== chartToken) return;
+    if (balanceChart) balanceChart.resize();
+    if (interestChart) interestChart.resize();
   });
 }
 
@@ -1500,10 +1677,12 @@ function renderStaticChart(kind, startingBalance, compact) {
   const datasets = kind === "interest"
     ? lineDatasets((plan) => interestChartPoints(plan))
     : lineDatasets((plan) => balanceChartPoints(plan, startingBalance));
+  const marker = kind === "interest" ? prepayInflection() : null;
   const chart = new Chart(canvas, {
     type: "line",
     data: { datasets },
-    options: lineChartOptions(true, compact),
+    options: lineChartOptions(true, compact, marker),
+    plugins: marker ? [prepayInflectionPlugin] : [],
   });
   const url = canvas.toDataURL("image/png");
   chart.destroy();
@@ -1752,7 +1931,7 @@ function pdfBar(name, amount, maxAbs, color, best) {
 
 function pdfBenefit(report) {
   const section = pdfEl("section", "pdf-section");
-  section.append(pdfEl("h2", "", "Net benefit"));
+  section.append(pdfEl("h2", "", "Interest saved"));
   if (report.advice && report.advice.text) {
     section.append(pdfEl("p", "pdf-advice", report.advice.text));
   }
@@ -1777,7 +1956,7 @@ function pdfBenefit(report) {
         : row.name;
     section.append(pdfBar(name, row.benefit, maxAbs, colors[row.tone] || "#475569", row.tone === "best"));
   });
-  section.append(pdfEl("p", "pdf-caption", "Bar length follows the absolute net benefit. A positive amount is interest saved versus the original plan."));
+  section.append(pdfEl("p", "pdf-caption", "Bar length follows the interest saved versus the original plan."));
   return section;
 }
 
@@ -1792,7 +1971,7 @@ async function pdfCharts(report) {
   const section = pdfEl("section", "pdf-section");
   section.append(pdfEl("h2", "", "Payoff trend"));
   if (typeof Chart === "undefined" || !viewPlans.length) {
-    section.append(pdfEl("p", "pdf-caption", "The trend chart needs Chart.js. The net-benefit bars above still compare the strategies."));
+    section.append(pdfEl("p", "pdf-caption", "The trend chart needs Chart.js. The interest-saved bars above still compare the strategies."));
     return section;
   }
   applyChartFont();
@@ -1813,6 +1992,13 @@ async function pdfCharts(report) {
     grid.append(card);
   }
   section.append(grid);
+  const marker = prepayInflection();
+  if (marker) {
+    const lines = inflectionLines(marker);
+    const note = pdfEl("div", "image-conclusion");
+    note.append(pdfEl("strong", "", lines.headline), pdfEl("span", "", lines.when));
+    section.append(note);
+  }
   return section;
 }
 
@@ -1880,7 +2066,7 @@ async function buildPdfSheet(report, dateText) {
   sheet.append(await pdfCharts(report));
   const side = pdfSide(report);
   if (side) sheet.append(side);
-  sheet.append(pdfEl("p", "pdf-foot", "Net benefit uses interest still to be paid. Refinance is shown after closing costs. Charts start with the next payment and leave out payments already made."));
+  sheet.append(pdfEl("p", "pdf-foot", "Interest saved is the interest still to be paid versus the original plan. Refinance is shown after closing costs. Charts start with the next payment and leave out payments already made."));
   return sheet;
 }
 
@@ -1906,6 +2092,7 @@ async function createImageReport(filename, sheet) {
   if (!latestReport) throw new Error("Calculate a loan before exporting");
   try {
     await loadScript(HTML2CANVAS_SRC);
+    if (!sheet) await loadScript(CHART_SRC);
   } catch (error) {
     throw new Error("The image tool did not finish loading. Refresh the page and try again.");
   }
@@ -1915,14 +2102,15 @@ async function createImageReport(filename, sheet) {
   const host = pdfEl("div", "pdf-root image-host");
   document.body.appendChild(host);
   try {
-    const canvas = await capturePdfNode(host, sheet || buildSummarySheet(latestReport));
+    const content = sheet || await buildSummarySheet(latestReport);
+    const canvas = await capturePdfNode(host, content);
     await showImagePreview(canvas, filename);
   } finally {
     host.remove();
   }
 }
 
-function buildSummarySheet(report) {
+async function buildSummarySheet(report) {
   const sheet = pdfEl("div", "image-sheet");
   sheet.append(pdfEl("h1", "", "Mortgage payoff report"));
   sheet.append(pdfEl("p", "image-kicker", pdfFacts(report)));
@@ -1931,8 +2119,19 @@ function buildSummarySheet(report) {
   if (report.advice && report.advice.text) sheet.append(pdfEl("p", "pdf-advice", report.advice.text));
   sheet.append(imagePaymentBlock(report));
   sheet.append(imageComparisonBlock(report));
-  sheet.append(pdfEl("p", "image-foot", "Long-press this image to save it to your phone."));
+  const charts = await pdfCharts(report);
+  charts.classList.add("image-charts");
+  sheet.append(charts);
+  sheet.append(imagePromoFooter());
   return sheet;
+}
+
+function imagePromoFooter() {
+  const footer = pdfEl("p", "image-promo");
+  footer.append(document.createTextNode("Want to calculate your own mortgage? Use the free tool: "));
+  footer.append(pdfEl("strong", "", "www.smartpayoffcalc.com"));
+  footer.append(document.createTextNode(" (runs on your device, nothing is collected)."));
+  return footer;
 }
 
 function imagePaymentBlock(report) {
@@ -1972,7 +2171,7 @@ function imageComparisonBlock(report) {
   table.className = "image-table";
   const head = document.createElement("thead");
   const headRow = document.createElement("tr");
-  ["Strategy", "Net benefit"].forEach((label) => headRow.append(pdfEl("th", "", label)));
+  ["Strategy", "Interest saved"].forEach((label) => headRow.append(pdfEl("th", "", label)));
   head.append(headRow);
   const body = document.createElement("tbody");
   rows.forEach((row) => {
