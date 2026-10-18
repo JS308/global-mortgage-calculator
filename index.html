@@ -122,15 +122,32 @@
         <div class="mt-3 space-y-3">
           <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p class="text-sm font-semibold text-slate-800">Same extra amount every year</p>
-            <p class="text-sm leading-relaxed text-slate-500">For a yearly bonus. Enter the amount and the calendar year you start. The extra amount is added to the last payment of that year, then every year after.</p>
+            <p class="text-sm leading-relaxed text-slate-500">For a yearly bonus. Enter the amount, then choose the month and the first year. That extra is added in the same month every year after.</p>
+            <label class="block text-sm font-medium text-slate-700" for="annual-extra">
+              Amount each year
+              <input id="annual-extra" name="annual-extra" type="text" inputmode="decimal" placeholder="e.g. 5,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            </label>
             <div class="grid grid-cols-2 gap-3">
-              <label class="block text-sm font-medium text-slate-700" for="annual-extra">
-                Amount each year
-                <input id="annual-extra" name="annual-extra" type="text" inputmode="decimal" placeholder="e.g. 5,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-              </label>
               <label class="block text-sm font-medium text-slate-700" for="annual-start-year">
                 Starting year
-                <input id="annual-start-year" name="annual-start-year" type="text" inputmode="numeric" placeholder="e.g. 2026" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+                <select id="annual-start-year" name="annual-start-year" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2"></select>
+              </label>
+              <label class="block text-sm font-medium text-slate-700" for="annual-start-month">
+                Month
+                <select id="annual-start-month" name="annual-start-month" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
               </label>
             </div>
             <p id="annual-extra-note" class="empty:hidden text-sm leading-relaxed text-slate-600"></p>

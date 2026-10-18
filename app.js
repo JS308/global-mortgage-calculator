@@ -68,8 +68,17 @@ document.getElementById("paid-months").addEventListener("input", () => {
   }
   document.getElementById("paid-helper-note").textContent = "";
 });
-["annual-extra", "annual-start-year", "years", "paid-months"].forEach((id) => {
-  document.getElementById(id).addEventListener("input", refreshAnnualPreview);
+["years", "paid-months"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", () => {
+    fillAnnualYearOptions();
+    refreshAnnualPreview();
+  });
+});
+document.getElementById("annual-extra").addEventListener("input", refreshAnnualPreview);
+document.getElementById("annual-start-year").addEventListener("change", refreshAnnualPreview);
+document.getElementById("annual-start-month").addEventListener("change", () => {
+  document.getElementById("annual-start-month").dataset.touched = "1";
+  refreshAnnualPreview();
 });
 bindAmountInput(document.getElementById("principal"));
 bindAmountInput(document.getElementById("annual-extra"));
@@ -98,6 +107,7 @@ let repayMethod = "installment";
 let paidMonthsShown = 0;
 let paidHistory = [];
 let loanStart = null;
+fillAnnualYearOptions();
 methodInstallmentButton.addEventListener("click", () => setRepayMethod("installment"));
 methodPrincipalButton.addEventListener("click", () => setRepayMethod("principal"));
 document.getElementById("balance-chart").closest("details").addEventListener("toggle", () => {
@@ -509,49 +519,81 @@ function readManualExtras(years, paid) {
   return extras;
 }
 
+function fillAnnualYearOptions() {
+  const yearSelect = document.getElementById("annual-start-year");
+  const selected = yearSelect.value;
+  const nowYear = new Date().getFullYear();
+  let first = nowYear;
+  let last = nowYear + 40;
+  const yearsRaw = document.getElementById("years").value.trim();
+  if (yearsRaw !== "") {
+    try {
+      const years = readYears("years", "Loan term");
+      const paid = readPaidMonths(years * 12);
+      const start = calendarFromAbsolute(paid + 1, paid);
+      const end = calendarFromAbsolute(years * 12, paid);
+      first = start.year;
+      last = Math.max(start.year, end.year);
+    } catch (error) {
+      first = nowYear;
+      last = nowYear + 40;
+    }
+  }
+  yearSelect.replaceChildren();
+  for (let year = first; year <= last; year++) {
+    const option = document.createElement("option");
+    option.value = String(year);
+    option.textContent = String(year);
+    yearSelect.append(option);
+  }
+  const preferred = selected || String(nowYear + 1);
+  const fallback = String(nowYear);
+  if ([...yearSelect.options].some((option) => option.value === preferred)) yearSelect.value = preferred;
+  else if ([...yearSelect.options].some((option) => option.value === fallback)) yearSelect.value = fallback;
+  const monthSelect = document.getElementById("annual-start-month");
+  if (monthSelect.dataset.touched !== "1") monthSelect.value = String(new Date().getMonth() + 1);
+}
+
 function readAnnualExtras(years, paid) {
   const amountRaw = document.getElementById("annual-extra").value.trim();
-  const yearRaw = document.getElementById("annual-start-year").value.trim();
-  if (amountRaw === "" && yearRaw === "") return { payments: [], summary: null };
-  if (amountRaw === "" || yearRaw === "") {
-    throw new Error("Yearly extra payment needs both an amount and the starting year");
-  }
+  if (amountRaw === "") return { payments: [], summary: null };
   const amount = roundMoney(parseAmount(amountRaw));
-  const startYear = Number(yearRaw);
+  const startYear = Number(document.getElementById("annual-start-year").value);
+  const month = Number(document.getElementById("annual-start-month").value);
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error("Yearly extra payment must be greater than 0");
   }
   if (!Number.isInteger(startYear) || startYear < 1900 || startYear > 2200) {
-    throw new Error("Starting year must be a calendar year, such as 2026");
+    throw new Error("Choose the year these payments start");
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error("Choose the month these payments happen");
   }
   const elapsed = paid || 0;
   const total = years * 12;
-  const byYear = new Map();
+  const hits = [];
   for (let absolute = elapsed + 1; absolute <= total; absolute++) {
     const when = calendarFromAbsolute(absolute, elapsed);
-    if (when.year < startYear) continue;
-    byYear.set(when.year, { absolute, month: when.month });
+    if (when.year < startYear || when.month !== month) continue;
+    hits.push({ absolute, year: when.year, month: when.month });
   }
-  const yearsFound = [...byYear.keys()].sort((a, b) => a - b);
-  if (!yearsFound.length) {
-    throw new Error(startYear + " is outside the remaining term. Choose a year that still has a payment");
+  if (!hits.length) {
+    throw new Error(monthName(month) + " " + startYear + " is outside the remaining term. Choose a month that still has a payment");
   }
-  const payments = yearsFound.map((year) => ({
-    月份: byYear.get(year).absolute - elapsed,
-    金额: amount,
-    每年: true,
-  }));
-  const first = byYear.get(yearsFound[0]);
-  const last = byYear.get(yearsFound[yearsFound.length - 1]);
   return {
-    payments,
+    payments: hits.map((hit) => ({
+      月份: hit.absolute - elapsed,
+      金额: amount,
+      每年: true,
+    })),
     summary: {
       amount,
-      startYear: yearsFound[0],
-      lastYear: yearsFound[yearsFound.length - 1],
-      count: payments.length,
-      firstMonthName: monthName(first.month),
-      lastMonthName: monthName(last.month),
+      month,
+      startYear: hits[0].year,
+      lastYear: hits[hits.length - 1].year,
+      count: hits.length,
+      firstMonthName: monthName(month),
+      lastMonthName: monthName(month),
     },
   };
 }
@@ -559,8 +601,7 @@ function readAnnualExtras(years, paid) {
 function refreshAnnualPreview() {
   const note = document.getElementById("annual-extra-note");
   const amountRaw = document.getElementById("annual-extra").value.trim();
-  const yearRaw = document.getElementById("annual-start-year").value.trim();
-  if (amountRaw === "" && yearRaw === "") {
+  if (amountRaw === "") {
     note.textContent = "";
     return;
   }
@@ -580,10 +621,11 @@ function refreshAnnualPreview() {
 
 function annualPreviewText(summary) {
   const count = summary.count === 1 ? "1 payment" : summary.count + " payments";
+  const when = summary.firstMonthName + " " + summary.startYear;
   if (summary.startYear === summary.lastYear) {
-    return "Adds " + formatSpeechMoney(summary.amount) + " with the " + summary.firstMonthName + " " + summary.startYear + " payment.";
+    return "Adds " + formatSpeechMoney(summary.amount) + " with the " + when + " payment.";
   }
-  return "Adds " + formatSpeechMoney(summary.amount) + " at the end of each year from " + summary.startYear + " through " + summary.lastYear + " (" + count + "). The first one is " + summary.firstMonthName + " " + summary.startYear + ".";
+  return "Adds " + formatSpeechMoney(summary.amount) + " every " + summary.firstMonthName + " from " + summary.startYear + " through " + summary.lastYear + " (" + count + ").";
 }
 
 function calendarFromAbsolute(absoluteNumber, paid) {
@@ -1618,7 +1660,7 @@ function pdfActionLine(report) {
   }
   if (report.annualExtra) {
     const item = report.annualExtra;
-    parts.push("Extra " + formatMoney(item.amount) + " at the end of each year from " + item.startYear + " (" + item.count + " payments)");
+    parts.push("Extra " + formatMoney(item.amount) + " every " + item.firstMonthName + " from " + item.startYear + " (" + item.count + " payments)");
   }
   if (report.opportunity) {
     parts.push("Cash on hand " + formatMoney(report.opportunity.cash) + " at " + report.opportunity.depositRatePercent + "% APY");
