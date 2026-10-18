@@ -65,15 +65,23 @@
         <input id="years" name="years" type="text" inputmode="numeric" placeholder="e.g. 30" autocomplete="off" required class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
       </label>
 
-      <div class="grid grid-cols-2 gap-3">
-        <label class="block text-sm font-medium text-slate-700">
-          Payments already made
-          <input id="paid-months" name="paid-months" type="text" inputmode="numeric" placeholder="0" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-        </label>
-        <div>
-          <p class="text-sm font-medium text-slate-700">Payments remaining</p>
-          <p id="remaining-months" class="mt-1.5 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-relaxed text-slate-900">Enter a term to see this</p>
+      <div>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block text-sm font-medium text-slate-700" for="paid-months">
+            Payments already made
+            <input id="paid-months" name="paid-months" type="text" inputmode="numeric" placeholder="0" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+          </label>
+          <div>
+            <p class="text-sm font-medium text-slate-700">Payments remaining</p>
+            <p id="remaining-months" class="mt-1.5 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-relaxed text-slate-900">Enter a term to see this</p>
+          </div>
         </div>
+        <p class="mt-1.5 text-sm leading-relaxed">
+          <button type="button" id="open-paid-date" class="helper-link">Don't know the count? Calculate from the date</button>
+          <span class="text-slate-500"> · </span>
+          <button type="button" id="open-paid-balance" class="helper-link">or enter remaining balance</button>
+        </p>
+        <p id="paid-helper-note" class="empty:hidden mt-1 text-sm leading-relaxed text-slate-600"></p>
       </div>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -109,10 +117,25 @@
       <details class="border-t border-slate-200 pt-4">
         <summary class="text-base font-semibold">
           Additional principal payments
-          <span class="fold-hint">Optional · more than one</span>
+          <span class="fold-hint">Optional · yearly or one-time</span>
         </summary>
         <div class="mt-3 space-y-3">
-          <p class="text-sm leading-relaxed text-slate-500">Enter the payment number. That amount is applied to principal in addition to the regular payment.</p>
+          <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p class="text-sm font-semibold text-slate-800">Same extra amount every year</p>
+            <p class="text-sm leading-relaxed text-slate-500">For a yearly bonus. Enter the amount and the first loan year. Loan year 1 is the first year of the loan. The extra amount is added to the last payment of that year, then every year after.</p>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-sm font-medium text-slate-700" for="annual-extra">
+                Amount each year
+                <input id="annual-extra" name="annual-extra" type="text" inputmode="decimal" placeholder="e.g. 5,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+              </label>
+              <label class="block text-sm font-medium text-slate-700" for="annual-start-year">
+                First loan year
+                <input id="annual-start-year" name="annual-start-year" type="text" inputmode="numeric" placeholder="e.g. 6" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+              </label>
+            </div>
+            <p id="annual-extra-note" class="empty:hidden text-sm leading-relaxed text-slate-600"></p>
+          </div>
+          <p class="text-sm leading-relaxed text-slate-500">Or add one-time payments. Payment numbers count from the first payment of the loan.</p>
           <div id="extra-list" class="space-y-3"></div>
           <button type="button" id="add-extra" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 active:bg-slate-100">Add another payment</button>
         </div>
@@ -159,6 +182,66 @@
 
     <p id="message" class="empty:hidden mt-3 text-sm text-rose-700" role="alert"></p>
 
+    <dialog id="image-preview" class="image-preview" aria-labelledby="image-preview-title">
+      <div class="space-y-3 p-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 id="image-preview-title" class="text-base font-semibold">Long-press the image to save it to your phone</h2>
+          <button type="button" id="close-image-preview" class="text-sm font-medium text-slate-500">Close</button>
+        </div>
+        <p class="text-sm leading-relaxed text-slate-600">On a phone, press and hold the image, then choose Save image. On a computer, use Save image below.</p>
+        <a id="image-download" class="inline-flex rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white" download="mortgage-report.png">Save image</a>
+        <img id="image-preview-img" alt="Report image. Long-press to save it to your phone." class="w-full rounded-xl border border-slate-200">
+      </div>
+    </dialog>
+
+    <dialog id="paid-helper" class="paid-dialog" aria-labelledby="paid-helper-title">
+      <form id="paid-helper-form" class="space-y-4 p-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 id="paid-helper-title" class="text-base font-semibold">How many payments are already made?</h2>
+          <button type="button" id="close-paid-helper" class="text-sm font-medium text-slate-500">Close</button>
+        </div>
+        <section class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <h3 class="text-sm font-semibold">From the remaining balance</h3>
+          <p class="text-sm leading-relaxed text-slate-500">Use the principal balance on your lender's home screen. We match it to a payment count using the loan amount, rate, term, and payment type above.</p>
+          <label class="block text-sm font-medium text-slate-700" for="helper-balance">
+            Remaining principal
+            <input id="helper-balance" type="text" inputmode="decimal" placeholder="e.g. 420,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+          </label>
+          <button type="button" id="apply-balance" class="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-semibold text-white active:bg-slate-800">Fill in the count</button>
+        </section>
+        <section class="space-y-3 rounded-xl border border-slate-200 p-3">
+          <h3 class="text-sm font-semibold">From the start date</h3>
+          <p class="text-sm leading-relaxed text-slate-500">Enter the month the loan was funded. We count from that month through this month.</p>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm font-medium text-slate-700" for="helper-year">
+              Year
+              <input id="helper-year" type="text" inputmode="numeric" placeholder="e.g. 2021" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            </label>
+            <label class="block text-sm font-medium text-slate-700" for="helper-month">
+              Month
+              <select id="helper-month" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+                <option value="">Month</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </label>
+          </div>
+          <button type="button" id="apply-date" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 active:bg-slate-100">Fill in the count</button>
+        </section>
+        <p id="paid-helper-error" class="empty:hidden text-sm leading-relaxed text-rose-700" role="alert"></p>
+      </form>
+    </dialog>
+
     <section id="result" hidden class="mt-4 space-y-3">
       <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p class="text-sm text-slate-500">Monthly housing payment</p>
@@ -199,6 +282,7 @@
       </article>
 
       <section id="comparison" hidden class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <p id="advice-card" hidden class="advice-card"></p>
         <div class="border-b border-slate-200 px-4 py-3">
           <h3 class="text-base font-semibold">Strategy comparison</h3>
           <p class="mt-1 text-xs leading-relaxed text-slate-500">Ranked by net benefit. Refinance is shown after closing costs. Green is best, blue is next, and red is worse than the original plan.</p>
@@ -247,18 +331,24 @@
 
       <details id="schedule-details" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <summary class="cursor-pointer text-base font-semibold">Amortization schedule</summary>
+        <p class="mt-2 text-xs leading-relaxed text-slate-500">The first column is the year and month, shortened as YYMM. 2609 means September 2026. If you entered a funding month, the first payment is the following month. Otherwise the latest payment already made is this month.</p>
         <div id="plan-switch" class="mt-3 flex flex-wrap gap-2"></div>
-        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <span class="font-medium text-slate-700">Export schedule</span>
-          <div id="export-plan-options" class="flex flex-wrap gap-x-4 gap-y-2"></div>
-          <button type="button" id="export-schedule" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 active:bg-slate-100">Export</button>
-        </div>
+        <fieldset class="mt-3">
+          <legend class="text-sm font-medium text-slate-700">Export as</legend>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-800">
+            <label class="inline-flex items-center gap-2"><input type="radio" name="schedule-export-kind" value="image" checked class="size-4 accent-slate-900">Long image</label>
+            <label class="inline-flex items-center gap-2"><input type="radio" name="schedule-export-kind" value="csv" class="size-4 accent-slate-900">CSV spreadsheet</label>
+          </div>
+        </fieldset>
+        <div id="export-plan-options" class="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm"></div>
+        <button type="button" id="export-schedule" class="mt-3 w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800 disabled:opacity-60">Export schedule</button>
+        <p class="mt-2 text-xs leading-relaxed text-slate-500">Long image is selected by default. Choose CSV if you want a spreadsheet on a computer. The best strategy is checked for you.</p>
         <p id="schedule-paid-note" class="empty:hidden mt-3 text-xs text-slate-500"></p>
         <div class="mt-3 max-h-80 overflow-auto rounded-xl border border-slate-200">
           <table class="w-full min-w-[26rem] border-collapse text-sm tabular-nums">
             <thead>
               <tr class="text-slate-500">
-                <th class="sticky top-0 bg-white px-3 py-2 text-left font-medium">Payment</th>
+                <th class="sticky top-0 bg-white px-3 py-2 text-left font-medium">Month</th>
                 <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">Amount</th>
                 <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">Principal</th>
                 <th class="sticky top-0 bg-white px-3 py-2 text-right font-medium">Interest</th>
@@ -270,7 +360,7 @@
         </div>
       </details>
 
-      <button type="button" id="export-pdf" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800 disabled:opacity-60">Export PDF report</button>
+      <button type="button" id="export-pdf" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800 disabled:opacity-60">Generate image report</button>
     </section>
   </main>
   <footer class="site-footer">© 2026 <a href="index.html">Mortgage Payoff Calculator</a> | <a href="about.html">About</a> | <a href="privacy.html">Privacy</a> | <a href="about.html#disclaimer">Disclaimer</a></footer>

@@ -406,3 +406,205 @@ input.field-missing {
   font-size: 10px;
   line-height: 1.4;
 }
+
+.helper-link {
+  font-weight: 500;
+  color: #0369a1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.advice-card {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  background: #f59e0b;
+  color: #1c1917;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.paid-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  max-height: min(40rem, calc(100vh - 2rem));
+  overflow: auto;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+}
+
+.paid-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.pdf-root .pdf-advice {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f59e0b;
+  color: #1c1917;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+#schedule-details fieldset {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.image-preview {
+  width: min(28rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.image-preview::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.image-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pdf-root.image-host {
+  width: 440px;
+}
+
+.pdf-root .image-sheet {
+  width: 420px;
+  box-sizing: border-box;
+  padding: 16px 14px 18px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.pdf-root .image-sheet h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.pdf-root .image-sheet h2 {
+  margin: 16px 0 8px;
+  font-size: 15px;
+}
+
+.pdf-root .image-kicker {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pdf-root .image-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pdf-root .image-label {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.pdf-root .image-gap {
+  margin-top: 12px;
+}
+
+.pdf-root .image-pay {
+  margin: 2px 0 10px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.pdf-root .image-interest {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pdf-root .image-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pdf-root .image-kpis span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.pdf-root .image-kpis strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.pdf-root .image-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-root .image-table th,
+.pdf-root .image-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 5px 3px;
+  text-align: right;
+  vertical-align: top;
+}
+
+.pdf-root .image-table th:first-child,
+.pdf-root .image-table td:first-child {
+  text-align: left;
+}
+
+.pdf-root .image-table th {
+  color: #64748b;
+  font-weight: 650;
+}
+
+.pdf-root .image-detail {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+.pdf-root .image-money {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pdf-root .image-table tr.is-best td { background: #ecfdf5; }
+.pdf-root .image-table tr.is-second td { background: #f0f9ff; }
+.pdf-root .image-table tr.is-bad td { background: #fff1f2; }
+.pdf-root .image-table tr.is-paid td { background: #e0e7ff; }
+
+.pdf-root .image-foot {
+  margin: 12px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}

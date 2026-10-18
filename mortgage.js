@@ -449,6 +449,61 @@ function currentBalance(principal, annualRate, years, elapsed, method, arm) {
 }
 
 /**
+ * Match a remaining principal balance to the payment count that produced it.
+ * Balances are compared after each payment, before the final payoff payment.
+ * On a tie, the earlier payment is kept.
+ */
+function paymentsFromBalance(principal, annualRate, years, targetBalance, method, arm) {
+  const target = roundMoney(targetBalance);
+  const start = roundMoney(principal);
+  if (!Number.isFinite(target) || target <= 0) {
+    throw new Error("Remaining principal must be a number greater than 0");
+  }
+  if (target > start) {
+    throw new Error("Remaining principal can't be higher than the loan amount");
+  }
+  if (target === start) {
+    return { paid: 0, balance: start, gap: 0 };
+  }
+
+  const balances = balancePath(principal, annualRate, years, method, arm);
+  let bestPaid = 0;
+  let bestBalance = start;
+  let bestGap = roundMoney(Math.abs(start - target));
+  for (let index = 0; index < balances.length; index++) {
+    const balance = balances[index];
+    const gap = roundMoney(Math.abs(balance - target));
+    if (gap < bestGap) {
+      bestPaid = index + 1;
+      bestBalance = balance;
+      bestGap = gap;
+    }
+    if (balance <= target) break;
+  }
+  return {
+    paid: bestPaid,
+    balance: bestBalance,
+    gap: roundMoney(bestBalance - target),
+  };
+}
+
+function balancePath(principal, annualRate, years, method, arm) {
+  if (arm) {
+    const schedule = runSchedule(method, "shorten", principal, annualRate, years, null, 0, arm);
+    return schedule.slice(0, -1).map((row) => row.剩余本金);
+  }
+  const loan = readLoan(principal, annualRate, years, null);
+  let balance = roundMoney(principal);
+  const scheduled = method === "principal" ? loan.monthlyPrincipal : loan.monthlyPayment;
+  const balances = [];
+  for (let month = 1; month < loan.months && balance > 0; month++) {
+    balance = paySlice(balance, loan.monthlyRate, scheduled, false, method).balance;
+    balances.push(balance);
+  }
+  return balances;
+}
+
+/**
  * ARM: the initial rate is used until the fixed period ends, as if it lasted the full term.
  * On the first adjusted payment, the payment is recast from the remaining balance and term.
  */
@@ -657,6 +712,7 @@ if (typeof module !== "undefined" && module.exports) {
     calcRefinance,
     runSchedule,
     currentBalance,
+    paymentsFromBalance,
     calcBiweekly,
   };
 

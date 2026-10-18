@@ -31,24 +31,49 @@ planSwitch.addEventListener("click", (event) => {
 
 document.getElementById("export-schedule").addEventListener("click", exportSelectedPlans);
 document.getElementById("export-pdf").addEventListener("click", () => {
-  const button = document.getElementById("export-pdf");
-  button.disabled = true;
-  button.textContent = "Creating…";
-  createPdfReport()
-    .then((pdf) => pdf.save("mortgage-payoff-report.pdf"))
-    .catch((error) => {
-      message.textContent = error.message || "Could not create the PDF";
-    })
-    .finally(() => {
-      button.disabled = false;
-      button.textContent = "Export PDF report";
-    });
+  runImageExport(document.getElementById("export-pdf"), "Generate image report", () => createImageReport("mortgage-payoff-report.png"));
+});
+document.getElementById("close-image-preview").addEventListener("click", () => document.getElementById("image-preview").close());
+document.getElementById("image-preview").addEventListener("click", (event) => {
+  if (event.target.id === "image-preview") event.target.close();
 });
 
 document.getElementById("add-extra").addEventListener("click", () => {
   addExtraRow();
 });
+document.getElementById("open-paid-date").addEventListener("click", () => openPaidHelper("helper-year"));
+document.getElementById("open-paid-balance").addEventListener("click", () => openPaidHelper("helper-balance"));
+document.getElementById("close-paid-helper").addEventListener("click", () => document.getElementById("paid-helper").close());
+document.getElementById("apply-balance").addEventListener("click", applyBalanceHelper);
+document.getElementById("apply-date").addEventListener("click", applyDateHelper);
+document.getElementById("paid-helper").addEventListener("click", (event) => {
+  if (event.target.id === "paid-helper") event.target.close();
+});
+document.getElementById("paid-helper-form").addEventListener("submit", (event) => event.preventDefault());
+document.getElementById("helper-balance").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  applyBalanceHelper();
+});
+document.getElementById("helper-year").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  applyDateHelper();
+});
+document.getElementById("paid-months").addEventListener("input", () => {
+  const input = document.getElementById("paid-months");
+  if (input.dataset.filledByHelper === "1") {
+    delete input.dataset.filledByHelper;
+    return;
+  }
+  document.getElementById("paid-helper-note").textContent = "";
+});
+["annual-extra", "annual-start-year", "years", "paid-months"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", refreshAnnualPreview);
+});
 bindAmountInput(document.getElementById("principal"));
+bindAmountInput(document.getElementById("annual-extra"));
+bindAmountInput(document.getElementById("helper-balance"));
 bindAmountInput(document.getElementById("spare"));
 bindAmountInput(document.getElementById("refi-fee"));
 bindAmountInput(document.getElementById("prepay"));
@@ -72,6 +97,7 @@ const methodBadge = document.getElementById("method-badge");
 let repayMethod = "installment";
 let paidMonthsShown = 0;
 let paidHistory = [];
+let loanStart = null;
 methodInstallmentButton.addEventListener("click", () => setRepayMethod("installment"));
 methodPrincipalButton.addEventListener("click", () => setRepayMethod("principal"));
 document.getElementById("balance-chart").closest("details").addEventListener("toggle", () => {
@@ -103,7 +129,9 @@ form.addEventListener("submit", (event) => {
   try {
     const years = readYears("years", "Loan term");
     const paid = readPaidMonths(years * 12);
-    const extras = readExtras(years, paid);
+    const manualExtras = readManualExtras(years, paid);
+    const annualExtra = readAnnualExtras(years, paid);
+    const extras = manualExtras.concat(annualExtra.payments);
     const arm = readArm(years);
     const housing = readHousing();
     const opportunityInput = readOpportunity();
@@ -144,7 +172,7 @@ form.addEventListener("submit", (event) => {
       ? calcBiweekly(principal, rate, years, paid, repayMethod, arm)
       : null;
     renderBiweekly(biweekly);
-    const comparisonRows = buildComparisonRows({
+    const comparisonInput = {
       original,
       originalInterest,
       originalPayment,
@@ -158,11 +186,13 @@ form.addEventListener("submit", (event) => {
       arm,
       heldRate,
       paid,
-    });
-    renderComparison(comparisonRows);
+      depositRatePercent: opportunityInput ? opportunityInput.ratePercent : null,
+    };
+    const comparisonRows = buildComparisonRows(comparisonInput);
+    const advice = buildAdvice(comparisonInput);
+    renderComparison(comparisonRows, advice);
     result.hidden = false;
-    const startingBalance = roundMoney(original[0].剩余本金 + original[0].本金部分);
-    showPlans(startingBalance, chartPlans({
+    const chartInput = {
       original,
       shortened,
       reduced,
@@ -170,7 +200,14 @@ form.addEventListener("submit", (event) => {
       refinance,
       biweekly,
       heldRate,
-    }));
+    };
+    const plans = chartPlans(chartInput);
+    showPlans(
+      roundMoney(original[0].剩余本金 + original[0].本金部分),
+      plans,
+      bestSchedulePlanId(comparisonRows, plans)
+    );
+    result.scrollIntoView({ behavior: "smooth", block: "start" });
     latestReport = {
       principal,
       ratePercent,
@@ -201,6 +238,8 @@ form.addEventListener("submit", (event) => {
       paid,
       prepay: singlePrepay,
       repayMethod,
+      annualExtra: annualExtra.summary,
+      advice,
       comparison: comparisonRows,
       plans: viewPlans.map((plan) => ({
         id: plan.id,
@@ -212,6 +251,7 @@ form.addEventListener("submit", (event) => {
     message.textContent = error.message;
     latestReport = null;
     clearVisualization();
+    message.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 });
 
@@ -421,7 +461,8 @@ function refreshRemaining() {
 function formatRemaining(total, paid) {
   const left = total - paid;
   if (left <= 0) return "Paid off";
-  return left + " payments";
+  const count = left + (left === 1 ? " payment" : " payments");
+  return count + "\n" + formatTerm(left) + " left";
 }
 
 function readPaidMonths(maxMonths) {
@@ -441,7 +482,7 @@ function readOptionalPrepay(id) {
   return readOptionalMoney(id, "Extra principal payment");
 }
 
-function readExtras(years, paid) {
+function readManualExtras(years, paid) {
   const totalMonths = years * 12;
   const elapsed = paid || 0;
   const extras = [];
@@ -466,6 +507,177 @@ function readExtras(years, paid) {
     });
   });
   return extras;
+}
+
+function readAnnualExtras(years, paid) {
+  const amountRaw = document.getElementById("annual-extra").value.trim();
+  const yearRaw = document.getElementById("annual-start-year").value.trim();
+  if (amountRaw === "" && yearRaw === "") return { payments: [], summary: null };
+  if (amountRaw === "" || yearRaw === "") {
+    throw new Error("Yearly extra payment needs both an amount and the first loan year");
+  }
+  const amount = roundMoney(parseAmount(amountRaw));
+  const startYear = Number(yearRaw);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Yearly extra payment must be greater than 0");
+  }
+  if (!Number.isInteger(startYear) || startYear < 1 || startYear > years) {
+    throw new Error("First loan year must be a whole number from 1 to " + years);
+  }
+  const elapsed = paid || 0;
+  const firstAbsolute = startYear * 12;
+  if (firstAbsolute <= elapsed) {
+    throw new Error("Loan year " + startYear + " has already ended. Choose a later year");
+  }
+  const payments = [];
+  for (let year = startYear; year <= years; year++) {
+    const absolute = year * 12;
+    if (absolute <= elapsed || absolute > years * 12) continue;
+    payments.push({ 月份: absolute - elapsed, 金额: amount, 每年: true });
+  }
+  if (!payments.length) {
+    throw new Error("Those yearly payments fall outside the remaining term");
+  }
+  return {
+    payments,
+    summary: {
+      amount,
+      startYear,
+      count: payments.length,
+      firstPayment: firstAbsolute,
+      lastYear: startYear + payments.length - 1,
+    },
+  };
+}
+
+function refreshAnnualPreview() {
+  const note = document.getElementById("annual-extra-note");
+  const amountRaw = document.getElementById("annual-extra").value.trim();
+  const yearRaw = document.getElementById("annual-start-year").value.trim();
+  if (amountRaw === "" && yearRaw === "") {
+    note.textContent = "";
+    return;
+  }
+  if (!document.getElementById("years").value.trim()) {
+    note.textContent = "Enter the loan term to preview these payments.";
+    return;
+  }
+  try {
+    const years = readYears("years", "Loan term");
+    const paid = readPaidMonths(years * 12);
+    const plan = readAnnualExtras(years, paid);
+    note.textContent = annualPreviewText(plan.summary);
+  } catch (error) {
+    note.textContent = error.message;
+  }
+}
+
+function annualPreviewText(summary) {
+  const span = summary.startYear === summary.lastYear
+    ? "loan year " + summary.startYear
+    : "loan years " + summary.startYear + " through " + summary.lastYear;
+  const count = summary.count === 1 ? "1 payment" : summary.count + " payments";
+  return "Adds " + formatSpeechMoney(summary.amount) + " at the end of " + span + " (" + count + ", first one at payment " + summary.firstPayment + ").";
+}
+
+function openPaidHelper(focusId) {
+  document.getElementById("paid-helper-error").textContent = "";
+  const dialog = document.getElementById("paid-helper");
+  if (!dialog.open) dialog.showModal();
+  const field = document.getElementById(focusId);
+  field.focus();
+  if (typeof field.select === "function" && field.value) field.select();
+}
+
+function applyBalanceHelper() {
+  const error = document.getElementById("paid-helper-error");
+  error.textContent = "";
+  try {
+    const loan = readLoanForHelper();
+    const raw = document.getElementById("helper-balance").value.trim();
+    if (raw === "") throw new Error("Enter the remaining principal");
+    const target = roundMoney(parseAmount(raw));
+    const match = paymentsFromBalance(loan.principal, loan.rate, loan.years, target, repayMethod, loan.arm);
+    const left = loan.years * 12 - match.paid;
+    const paidLabel = match.paid + (match.paid === 1 ? " payment" : " payments");
+    const leftLabel = left + (left === 1 ? " payment" : " payments");
+    let note = paidLabel + " filled in from a remaining balance of " + formatMoney(target) + ".";
+    if (Math.abs(match.gap) >= 0.01) {
+      const direction = match.gap > 0 ? "higher" : "lower";
+      note += " The closest schedule balance is " + formatMoney(match.balance) + ", which is " + formatMoney(Math.abs(match.gap)) + " " + direction + ".";
+    } else {
+      note += " That matches the schedule exactly.";
+    }
+    note += " " + leftLabel + " (" + formatTerm(left) + ") remain.";
+    fillPaidMonths(match.paid, note);
+  } catch (caught) {
+    error.textContent = caught.message;
+  }
+}
+
+function applyDateHelper() {
+  const error = document.getElementById("paid-helper-error");
+  error.textContent = "";
+  try {
+    const year = Number(document.getElementById("helper-year").value.trim());
+    const month = Number(document.getElementById("helper-month").value);
+    if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+      throw new Error("Enter the year the loan was funded");
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new Error("Choose the month the loan was funded");
+    }
+    const paid = monthsSince(year, month);
+    if (paid < 0) throw new Error("That date is in the future");
+    const yearsRaw = document.getElementById("years").value.trim();
+    if (yearsRaw !== "") {
+      const years = readYears("years", "Loan term");
+      if (paid >= years * 12) {
+        throw new Error("That date means " + paid + " payments, which covers the whole " + years + "-year term");
+      }
+    }
+    const monthName = document.getElementById("helper-month").selectedOptions[0].textContent;
+    loanStart = { year, month };
+    const note = paid === 0
+      ? "0 payments filled in. The loan started this month."
+      : paid + " payments filled in, from " + monthName + " " + year + " through this month (" + formatTerm(paid) + ").";
+    fillPaidMonths(paid, note);
+  } catch (caught) {
+    error.textContent = caught.message;
+  }
+}
+
+function readLoanForHelper() {
+  const missing = missingRequiredFields();
+  if (missing.length) {
+    throw new Error("Enter the " + missing.map((item) => item[1]).join(", ") + " above first");
+  }
+  const years = readYears("years", "Loan term");
+  const principal = readDollar("principal");
+  const ratePercent = readNumber("rate");
+  if (!Number.isFinite(principal) || principal <= 0) {
+    throw new Error("Loan amount must be greater than 0");
+  }
+  if (!Number.isFinite(ratePercent) || ratePercent < 0) {
+    throw new Error("Interest rate must be 0 or higher");
+  }
+  return { years, principal, rate: ratePercent / 100, arm: readArm(years) };
+}
+
+function monthsSince(year, month, today) {
+  const now = today || new Date();
+  return (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month);
+}
+
+function fillPaidMonths(paid, note) {
+  const input = document.getElementById("paid-months");
+  input.dataset.filledByHelper = "1";
+  input.value = String(paid);
+  input.classList.remove("field-missing");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  document.getElementById("paid-helper-note").textContent = note;
+  document.getElementById("paid-helper-error").textContent = "";
+  document.getElementById("paid-helper").close();
 }
 
 function readOpportunity() {
@@ -655,11 +867,125 @@ function paymentChangeNote(before, after) {
   return "Payment stays the same";
 }
 
-function renderComparison(rows) {
+function buildAdvice(input) {
+  const options = [];
+  const total = input.original.length;
+  if (input.shortened) {
+    const saved = roundMoney(input.originalInterest - sumInterest(input.shortened));
+    const reduceSaved = input.reduced ? roundMoney(input.originalInterest - sumInterest(input.reduced)) : null;
+    options.push({
+      kind: "shorten",
+      benefit: saved,
+      versusReduce: reduceSaved == null ? null : roundMoney(saved - reduceSaved),
+      monthsSaved: Math.max(0, total - input.shortened.length),
+    });
+  }
+  if (input.reduced) {
+    const paymentAmount = reducedMonthlyPayment(input.reduced, input.extras, total, input.originalPayment);
+    options.push({
+      kind: "reduce",
+      benefit: roundMoney(input.originalInterest - sumInterest(input.reduced)),
+      drop: roundMoney(input.originalPayment - paymentAmount),
+    });
+  }
+  if (input.biweekly) {
+    options.push({
+      kind: "biweekly",
+      benefit: input.biweekly.savedInterest,
+      monthsSaved: Math.max(0, input.biweekly.monthsSaved),
+    });
+  }
+  if (input.opportunity) {
+    const item = input.opportunity;
+    options.push({
+      kind: "shorten",
+      benefit: item.缩短节省利息,
+      versusReduce: roundMoney(item.缩短节省利息 - item.减供节省利息),
+      monthsSaved: Math.max(0, item.提前月数),
+    });
+    options.push({
+      kind: "reduce",
+      benefit: item.减供节省利息,
+      drop: roundMoney(item.缩短月供 - item.减供月供),
+    });
+    const prepayBest = Math.max(item.缩短节省利息, item.减供节省利息);
+    options.push({
+      kind: "invest",
+      benefit: item.存款收益,
+      ahead: roundMoney(item.存款收益 - prepayBest),
+      rate: input.depositRatePercent,
+    });
+  }
+  if (input.refinance) {
+    options.push({
+      kind: "refinance",
+      benefit: roundMoney(input.refinance.节省利息 - input.refinance.手续费),
+      payment: input.refinance.新月供,
+    });
+  }
+  if (!options.length) {
+    if (input.arm && input.heldRate) {
+      return { text: "The rate change is what moves the interest. Add extra payments, bi-weekly payments, or a refinance to see what to do next." };
+    }
+    return null;
+  }
+  const kindRank = { shorten: 0, refinance: 1, biweekly: 2, reduce: 3, invest: 4 };
+  options.sort((a, b) => b.benefit - a.benefit || kindRank[a.kind] - kindRank[b.kind]);
+  const best = options[0];
+  if (best.benefit <= 0) {
+    return { text: "Keep your current loan. None of these changes comes out ahead." };
+  }
+  if (best.kind === "shorten") return { text: shortenAdvice(best) };
+  if (best.kind === "invest") {
+    if (best.ahead > 0) {
+      return { text: "Don't pay the mortgage off early. If your savings earn " + formatRate(best.rate) + "%, investing this money comes out " + formatSpeechMoney(best.ahead) + " ahead of paying extra." };
+    }
+    return { text: "Don't pay the mortgage off early. At " + formatRate(best.rate) + "%, investing this money earns as much as paying extra." };
+  }
+  if (best.kind === "reduce") {
+    const saved = formatSpeechMoney(best.benefit);
+    const dropText = best.drop > 0
+      ? "Your payment drops by " + formatSpeechMoney(best.drop) + ", and you save " + saved + " in interest."
+      : "You save " + saved + " in interest.";
+    return { text: "Choose “pay extra and lower the payment.” " + dropText };
+  }
+  if (best.kind === "biweekly") {
+    const saved = formatSpeechMoney(best.benefit);
+    if (best.monthsSaved > 0) {
+      return { text: "Choose bi-weekly payments. You pay the loan off " + formatTerm(best.monthsSaved) + " sooner and save " + saved + " in interest." };
+    }
+    return { text: "Choose bi-weekly payments. You save " + saved + " in interest versus paying monthly." };
+  }
+  const net = formatSpeechMoney(best.benefit);
+  return { text: "Refinance. After closing costs, you come out " + net + " ahead, and principal and interest becomes " + formatSpeechMoney(best.payment) + "." };
+}
+
+function shortenAdvice(best) {
+  const sooner = best.monthsSaved > 0 ? formatTerm(best.monthsSaved) : "";
+  if (best.versusReduce > 0 && sooner) {
+    return "Choose “pay extra and shorten the term.” You save " + formatSpeechMoney(best.versusReduce) + " more interest than lowering the payment, and you pay the loan off " + sooner + " sooner.";
+  }
+  if (sooner) {
+    return "Choose “pay extra and shorten the term.” You pay the loan off " + sooner + " sooner and save " + formatSpeechMoney(best.benefit) + " in interest.";
+  }
+  return "Choose “pay extra and shorten the term.” You save " + formatSpeechMoney(best.benefit) + " in interest.";
+}
+
+function renderComparison(rows, advice) {
   comparisonBody.replaceChildren();
+  const card = document.getElementById("advice-card");
   if (!rows.length) {
     comparison.hidden = true;
+    card.hidden = true;
+    card.textContent = "";
     return;
+  }
+  if (advice && advice.text) {
+    card.hidden = false;
+    card.textContent = "💡 " + advice.text;
+  } else {
+    card.hidden = true;
+    card.textContent = "";
   }
   const toneClass = {
     best: "bg-emerald-50 text-emerald-950",
@@ -760,6 +1086,23 @@ function formatMoney(amount) {
   });
 }
 
+function formatSpeechMoney(amount) {
+  const exact = Math.abs(roundMoney(amount));
+  const whole = Math.round(exact);
+  const sign = amount < 0 ? "-" : "";
+  if (whole === 0 && exact > 0) {
+    return sign + "$" + exact.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  return sign + "$" + whole.toLocaleString("en-US");
+}
+
+function formatRate(percent) {
+  return String(roundMoney(percent));
+}
+
 function formatAmountInput(value) {
   const amount = parseAmount(String(value).replace(/[.,]+$/, ""));
   if (!Number.isFinite(amount)) return "";
@@ -807,9 +1150,11 @@ function chartPlans(input) {
   return plans;
 }
 
-function showPlans(principal, plans) {
+function showPlans(principal, plans, preferredId) {
   viewPlans = plans;
-  if (!viewPlans.some((plan) => plan.id === activePlanId)) {
+  if (preferredId && viewPlans.some((plan) => plan.id === preferredId)) {
+    activePlanId = preferredId;
+  } else if (!viewPlans.some((plan) => plan.id === activePlanId)) {
     const preferred = viewPlans.find((plan) => plan.id !== "original" && plan.id !== "arm-initial");
     activePlanId = preferred ? preferred.id : "original";
   }
@@ -817,6 +1162,49 @@ function showPlans(principal, plans) {
   renderPlanSwitch();
   renderExportOptions();
   renderTable();
+}
+
+function bestSchedulePlanId(rows, plans) {
+  const ids = new Set(plans.map((plan) => plan.id));
+  for (const row of rows || []) {
+    if (row.name === "Monthly compounded savings") return ids.has("original") ? "original" : plans[0].id;
+    if (row.name === "Initial rate for the full term") continue;
+    const id = schedulePlanIdForRow(row.name);
+    if (id && ids.has(id)) return id;
+  }
+  if (ids.has("original")) return "original";
+  return plans[0] ? plans[0].id : "original";
+}
+
+function schedulePlanIdForRow(name) {
+  const map = {
+    "Original plan": "original",
+    "Extra principal, shorter term": "extra-shorten",
+    "Bi-weekly payments": "biweekly",
+    "Extra principal, lower payment": "extra-reduce",
+    "Cash toward a shorter term": "spare-shorten",
+    "Cash toward a lower payment": "spare-reduce",
+    "Refinance": "refinance",
+    "Initial rate for the full term": "arm-initial",
+  };
+  return map[name] || null;
+}
+
+function paymentMonthIndex(absoluteNumber) {
+  if (loanStart && Number.isInteger(loanStart.year) && Number.isInteger(loanStart.month)) {
+    return loanStart.year * 12 + (loanStart.month - 1) + absoluteNumber;
+  }
+  const now = new Date();
+  const nowIndex = now.getFullYear() * 12 + now.getMonth();
+  if (paidMonthsShown > 0) return nowIndex - paidMonthsShown + absoluteNumber;
+  return nowIndex + absoluteNumber - 1;
+}
+
+function formatPaymentStamp(absoluteNumber) {
+  const index = paymentMonthIndex(absoluteNumber);
+  const year = Math.floor(index / 12);
+  const month = index % 12 + 1;
+  return String(year % 100).padStart(2, "0") + String(month).padStart(2, "0");
 }
 
 function clearVisualization() {
@@ -1074,7 +1462,7 @@ function renderTable() {
   displaySchedule(plan).forEach((row, index) => {
     const tr = document.createElement("tr");
     tr.className = row.已还 ? "paid-row" : (index % 2 === 1 ? "bg-slate-50" : "");
-    [row.月份, formatMoney(row.月供), formatMoney(row.本金部分), formatMoney(row.利息部分), formatMoney(row.剩余本金)]
+    [formatPaymentStamp(row.月份), formatMoney(row.月供), formatMoney(row.本金部分), formatMoney(row.利息部分), formatMoney(row.剩余本金)]
       .forEach((text, cellIndex) => {
         const cell = document.createElement("td");
         cell.className = cellIndex === 0
@@ -1097,7 +1485,7 @@ function renderExportOptions() {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.value = plan.id;
-    input.checked = true;
+    input.checked = plan.id === activePlanId;
     input.className = "size-4 accent-slate-900";
     label.append(input, document.createTextNode(plan.name));
     box.append(label);
@@ -1105,10 +1493,10 @@ function renderExportOptions() {
 }
 
 function buildCsv(plan) {
-  const lines = ["Payment,Amount,Principal,Interest,Balance"];
+  const lines = ["Month,Amount,Principal,Interest,Balance"];
   displaySchedule(plan).forEach((row) => {
     lines.push([
-      row.月份,
+      formatPaymentStamp(row.月份),
       row.月供.toFixed(2),
       row.本金部分.toFixed(2),
       row.利息部分.toFixed(2),
@@ -1118,6 +1506,11 @@ function buildCsv(plan) {
   return lines.join("\r\n");
 }
 
+function scheduleExportKind() {
+  const selected = document.querySelector('input[name="schedule-export-kind"]:checked');
+  return selected && selected.value === "csv" ? "csv" : "image";
+}
+
 function exportSelectedPlans() {
   const selected = new Set(
     [...document.querySelectorAll("#export-plan-options input:checked")].map((input) => input.value)
@@ -1125,9 +1518,22 @@ function exportSelectedPlans() {
   const plans = viewPlans.filter((plan) => selected.has(plan.id));
   if (!plans.length) {
     message.textContent = "Select at least one schedule";
+    message.scrollIntoView({ behavior: "smooth", block: "nearest" });
     return;
   }
   message.textContent = "";
+  if (scheduleExportKind() === "csv") {
+    exportScheduleCsv(plans);
+    return;
+  }
+  runImageExport(document.getElementById("export-schedule"), "Export schedule", () => createImageReport(scheduleImageName(plans), buildScheduleSheet(plans)));
+}
+
+function scheduleImageName(plans) {
+  return plans.length === 1 ? "amortization-" + plans[0].name + ".png" : "amortization-schedules.png";
+}
+
+function exportScheduleCsv(plans) {
   const csv = "\uFEFF" + plans.map((plan) => plan.name + "\r\n" + buildCsv(plan)).join("\r\n\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
@@ -1137,6 +1543,21 @@ function exportSelectedPlans() {
   link.click();
   link.remove();
   URL.revokeObjectURL(link.href);
+}
+
+function runImageExport(button, label, task) {
+  button.disabled = true;
+  button.textContent = "Creating…";
+  Promise.resolve()
+    .then(task)
+    .catch((error) => {
+      message.textContent = error.message || "Could not create the image";
+      message.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    })
+    .finally(() => {
+      button.disabled = false;
+      button.textContent = label;
+    });
 }
 
 function formatReportDate(date) {
@@ -1171,12 +1592,17 @@ function pdfActionLine(report) {
   const prepay = report.prepay || 0;
   if (prepay > 0) parts.push("Extra principal " + formatMoney(prepay));
   report.extras.forEach((item) => {
+    if (item.每年) return;
     if (prepay > 0 && item.月份 === 1 && item.金额 === prepay) return;
     parts.push("Payment " + item.月份 + ": extra principal " + formatMoney(item.金额));
   });
   if (report.biweekly) parts.push("Bi-weekly " + formatMoney(report.biweekly.biweeklyPayment));
   if (report.housing && report.housing.monthlyEscrow > 0) {
     parts.push("PMI " + formatMoney(report.housing.pmi) + ", tax " + formatMoney(report.housing.propertyTax) + "/yr, insurance " + formatMoney(report.housing.insurance) + "/yr");
+  }
+  if (report.annualExtra) {
+    const item = report.annualExtra;
+    parts.push("Extra " + formatMoney(item.amount) + " at the end of each loan year from year " + item.startYear + " (" + item.count + " payments)");
   }
   if (report.opportunity) {
     parts.push("Cash on hand " + formatMoney(report.opportunity.cash) + " at " + report.opportunity.depositRatePercent + "% APY");
@@ -1253,6 +1679,9 @@ function pdfBar(name, amount, maxAbs, color, best) {
 function pdfBenefit(report) {
   const section = pdfEl("section", "pdf-section");
   section.append(pdfEl("h2", "", "Net benefit"));
+  if (report.advice && report.advice.text) {
+    section.append(pdfEl("p", "pdf-advice", report.advice.text));
+  }
   const rows = report.comparison || [];
   if (rows.length < 2) {
     section.append(pdfEl("p", "pdf-caption", "Only the original plan is shown. Add extra principal, bi-weekly payments, cash on hand, or a refinance to compare interest."));
@@ -1383,8 +1812,10 @@ async function buildPdfSheet(report, dateText) {
 
 async function capturePdfNode(host, node) {
   host.replaceChildren(node);
+  const height = Math.max(host.scrollHeight, 1);
+  const scale = height > 7000 ? 1 : 2;
   return html2canvas(host, {
-    scale: 2,
+    scale,
     backgroundColor: "#ffffff",
     logging: false,
     onclone(doc) {
@@ -1394,6 +1825,147 @@ async function capturePdfNode(host, node) {
       root.style.left = "0";
       root.style.top = "0";
     },
+  });
+}
+
+async function createImageReport(filename, sheet) {
+  if (!latestReport) throw new Error("Calculate a loan before exporting");
+  try {
+    await loadScript(HTML2CANVAS_SRC);
+  } catch (error) {
+    throw new Error("The image tool did not finish loading. Refresh the page and try again.");
+  }
+  if (typeof html2canvas !== "function") {
+    throw new Error("The image tool did not finish loading. Refresh the page and try again.");
+  }
+  const host = pdfEl("div", "pdf-root image-host");
+  document.body.appendChild(host);
+  try {
+    const canvas = await capturePdfNode(host, sheet || buildSummarySheet(latestReport));
+    await showImagePreview(canvas, filename);
+  } finally {
+    host.remove();
+  }
+}
+
+function buildSummarySheet(report) {
+  const sheet = pdfEl("div", "image-sheet");
+  sheet.append(pdfEl("h1", "", "Mortgage payoff report"));
+  sheet.append(pdfEl("p", "image-kicker", pdfFacts(report)));
+  const action = pdfActionLine(report);
+  if (action) sheet.append(pdfEl("p", "image-kicker", action));
+  if (report.advice && report.advice.text) sheet.append(pdfEl("p", "pdf-advice", report.advice.text));
+  sheet.append(imagePaymentBlock(report));
+  sheet.append(imageComparisonBlock(report));
+  sheet.append(pdfEl("p", "image-foot", "Long-press this image to save it to your phone."));
+  return sheet;
+}
+
+function imagePaymentBlock(report) {
+  const section = pdfEl("section", "image-block");
+  section.append(pdfEl("p", "image-label", "Monthly housing payment"));
+  section.append(pdfEl("p", "image-pay", formatMoney(report.monthlyHousing || report.originalPayment)));
+  const housing = report.housing || { pmi: 0, taxMonthly: 0, insuranceMonthly: 0 };
+  const grid = pdfEl("div", "image-kpis");
+  [
+    ["Principal & interest", formatMoney(report.originalPayment)],
+    ["PMI", formatMoney(housing.pmi)],
+    ["Property tax", formatMoney(housing.taxMonthly)],
+    ["Home insurance", formatMoney(housing.insuranceMonthly)],
+  ].forEach(([label, value]) => {
+    const item = pdfEl("div", "");
+    item.append(pdfEl("span", "", label), pdfEl("strong", "", value));
+    grid.append(item);
+  });
+  section.append(grid);
+  section.append(pdfEl("p", "image-label image-gap", "Total interest"));
+  section.append(pdfEl("p", "image-interest", formatMoney(report.interestSummary.full)));
+  if (report.paid > 0) {
+    section.append(pdfEl("p", "image-kicker", "Interest still to pay " + formatMoney(report.interestSummary.remaining)));
+  }
+  return section;
+}
+
+function imageComparisonBlock(report) {
+  const section = pdfEl("section", "image-block");
+  section.append(pdfEl("h2", "", "Strategy comparison"));
+  const rows = report.comparison || [];
+  if (rows.length < 2) {
+    section.append(pdfEl("p", "image-kicker", "Add extra principal, bi-weekly payments, cash on hand, or a refinance to compare strategies."));
+    return section;
+  }
+  const table = document.createElement("table");
+  table.className = "image-table";
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  ["Strategy", "Net benefit"].forEach((label) => headRow.append(pdfEl("th", "", label)));
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.className = "is-" + (row.tone || "base");
+    const name = pdfEl("td", "", row.name);
+    name.append(pdfEl("div", "image-detail", row.note));
+    tr.append(name, pdfEl("td", "image-money", formatBenefit(row.benefit)));
+    body.append(tr);
+  });
+  table.append(head, body);
+  section.append(table);
+  return section;
+}
+
+function buildScheduleSheet(plans) {
+  const sheet = pdfEl("div", "image-sheet");
+  sheet.append(pdfEl("h1", "", "Amortization schedule"));
+  sheet.append(pdfEl("p", "image-kicker", "Months are shown as YYMM. 2609 means September 2026."));
+  plans.forEach((plan) => {
+    sheet.append(pdfEl("h2", "", plan.name));
+    const table = document.createElement("table");
+    table.className = "image-table";
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    ["Month", "Amount", "Principal", "Interest", "Balance"].forEach((label) => headRow.append(pdfEl("th", "", label)));
+    head.append(headRow);
+    const body = document.createElement("tbody");
+    displaySchedule(plan).forEach((row) => {
+      const tr = document.createElement("tr");
+      if (row.已还) tr.className = "is-paid";
+      [
+        formatPaymentStamp(row.月份),
+        formatMoney(row.月供),
+        formatMoney(row.本金部分),
+        formatMoney(row.利息部分),
+        formatMoney(row.剩余本金),
+      ].forEach((text) => tr.append(pdfEl("td", "", text)));
+      body.append(tr);
+    });
+    table.append(head, body);
+    sheet.append(table);
+  });
+  sheet.append(pdfEl("p", "image-foot", "Long-press this image to save it to your phone."));
+  return sheet;
+}
+
+function showImagePreview(canvas, filename) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Could not create the image"));
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const img = document.getElementById("image-preview-img");
+      if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+      img.dataset.url = url;
+      img.src = url;
+      img.alt = "Report image. Long-press to save it to your phone.";
+      const link = document.getElementById("image-download");
+      link.href = url;
+      link.download = filename;
+      const dialog = document.getElementById("image-preview");
+      if (!dialog.open) dialog.showModal();
+      resolve();
+    }, "image/png");
   });
 }
 
