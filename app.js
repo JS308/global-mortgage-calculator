@@ -1098,36 +1098,20 @@ function readOptionalMoney(id, label) {
 
 function formatMoney(amount) {
   const sign = amount < 0 ? "-" : "";
-  return sign + "$" + Math.abs(roundMoney(amount)).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const whole = Math.round(Math.abs(roundMoney(amount)));
+  return sign + "$" + whole.toLocaleString("en-US");
 }
 
 function formatCompactMoney(amount) {
   const abs = Math.abs(roundMoney(amount));
   if (abs <= 100000) return formatMoney(amount);
   const sign = amount < 0 ? "-" : "";
-  const thousands = Math.round(abs / 100) / 10;
-  const digits = Number.isInteger(thousands) ? 0 : 1;
-  return sign + "$" + thousands.toLocaleString("en-US", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }) + "K";
+  const thousands = Math.round(abs / 1000);
+  return sign + "$" + thousands.toLocaleString("en-US") + "K";
 }
 
 function formatSpeechMoney(amount) {
-  const exact = Math.abs(roundMoney(amount));
-  if (exact > 100000) return formatCompactMoney(amount);
-  const whole = Math.round(exact);
-  const sign = amount < 0 ? "-" : "";
-  if (whole === 0 && exact > 0) {
-    return sign + "$" + exact.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  }
-  return sign + "$" + whole.toLocaleString("en-US");
+  return formatCompactMoney(amount);
 }
 
 function formatRate(percent) {
