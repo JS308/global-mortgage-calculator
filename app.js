@@ -108,6 +108,7 @@ let paidMonthsShown = 0;
 let paidHistory = [];
 let loanStart = null;
 fillAnnualYearOptions();
+fillHelperYearOptions();
 methodInstallmentButton.addEventListener("click", () => setRepayMethod("installment"));
 methodPrincipalButton.addEventListener("click", () => setRepayMethod("principal"));
 document.getElementById("balance-chart").closest("details").addEventListener("toggle", () => {
@@ -519,6 +520,21 @@ function readManualExtras(years, paid) {
   return extras;
 }
 
+function fillHelperYearOptions() {
+  const yearSelect = document.getElementById("helper-year");
+  const selected = yearSelect.value;
+  const nowYear = new Date().getFullYear();
+  yearSelect.replaceChildren();
+  for (let year = nowYear; year >= nowYear - 40; year--) {
+    const option = document.createElement("option");
+    option.value = String(year);
+    option.textContent = String(year);
+    yearSelect.append(option);
+  }
+  const preferred = selected || String(nowYear);
+  if ([...yearSelect.options].some((option) => option.value === preferred)) yearSelect.value = preferred;
+}
+
 function fillAnnualYearOptions() {
   const yearSelect = document.getElementById("annual-start-year");
   const selected = yearSelect.value;
@@ -682,7 +698,7 @@ function applyDateHelper() {
     const year = Number(document.getElementById("helper-year").value.trim());
     const month = Number(document.getElementById("helper-month").value);
     if (!Number.isInteger(year) || year < 1900 || year > 2100) {
-      throw new Error("Enter the year the loan was funded");
+      throw new Error("Choose the year the loan was funded");
     }
     if (!Number.isInteger(month) || month < 1 || month > 12) {
       throw new Error("Choose the month the loan was funded");
