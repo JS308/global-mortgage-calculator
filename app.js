@@ -514,38 +514,44 @@ function readAnnualExtras(years, paid) {
   const yearRaw = document.getElementById("annual-start-year").value.trim();
   if (amountRaw === "" && yearRaw === "") return { payments: [], summary: null };
   if (amountRaw === "" || yearRaw === "") {
-    throw new Error("Yearly extra payment needs both an amount and the first loan year");
+    throw new Error("Yearly extra payment needs both an amount and the starting year");
   }
   const amount = roundMoney(parseAmount(amountRaw));
   const startYear = Number(yearRaw);
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error("Yearly extra payment must be greater than 0");
   }
-  if (!Number.isInteger(startYear) || startYear < 1 || startYear > years) {
-    throw new Error("First loan year must be a whole number from 1 to " + years);
+  if (!Number.isInteger(startYear) || startYear < 1900 || startYear > 2200) {
+    throw new Error("Starting year must be a calendar year, such as 2026");
   }
   const elapsed = paid || 0;
-  const firstAbsolute = startYear * 12;
-  if (firstAbsolute <= elapsed) {
-    throw new Error("Loan year " + startYear + " has already ended. Choose a later year");
+  const total = years * 12;
+  const byYear = new Map();
+  for (let absolute = elapsed + 1; absolute <= total; absolute++) {
+    const when = calendarFromAbsolute(absolute, elapsed);
+    if (when.year < startYear) continue;
+    byYear.set(when.year, { absolute, month: when.month });
   }
-  const payments = [];
-  for (let year = startYear; year <= years; year++) {
-    const absolute = year * 12;
-    if (absolute <= elapsed || absolute > years * 12) continue;
-    payments.push({ 月份: absolute - elapsed, 金额: amount, 每年: true });
+  const yearsFound = [...byYear.keys()].sort((a, b) => a - b);
+  if (!yearsFound.length) {
+    throw new Error(startYear + " is outside the remaining term. Choose a year that still has a payment");
   }
-  if (!payments.length) {
-    throw new Error("Those yearly payments fall outside the remaining term");
-  }
+  const payments = yearsFound.map((year) => ({
+    月份: byYear.get(year).absolute - elapsed,
+    金额: amount,
+    每年: true,
+  }));
+  const first = byYear.get(yearsFound[0]);
+  const last = byYear.get(yearsFound[yearsFound.length - 1]);
   return {
     payments,
     summary: {
       amount,
-      startYear,
+      startYear: yearsFound[0],
+      lastYear: yearsFound[yearsFound.length - 1],
       count: payments.length,
-      firstPayment: firstAbsolute,
-      lastYear: startYear + payments.length - 1,
+      firstMonthName: monthName(first.month),
+      lastMonthName: monthName(last.month),
     },
   };
 }
@@ -573,11 +579,23 @@ function refreshAnnualPreview() {
 }
 
 function annualPreviewText(summary) {
-  const span = summary.startYear === summary.lastYear
-    ? "loan year " + summary.startYear
-    : "loan years " + summary.startYear + " through " + summary.lastYear;
   const count = summary.count === 1 ? "1 payment" : summary.count + " payments";
-  return "Adds " + formatSpeechMoney(summary.amount) + " at the end of " + span + " (" + count + ", first one at payment " + summary.firstPayment + ").";
+  if (summary.startYear === summary.lastYear) {
+    return "Adds " + formatSpeechMoney(summary.amount) + " with the " + summary.firstMonthName + " " + summary.startYear + " payment.";
+  }
+  return "Adds " + formatSpeechMoney(summary.amount) + " at the end of each year from " + summary.startYear + " through " + summary.lastYear + " (" + count + "). The first one is " + summary.firstMonthName + " " + summary.startYear + ".";
+}
+
+function calendarFromAbsolute(absoluteNumber, paid) {
+  const index = paymentMonthIndex(absoluteNumber, paid);
+  return {
+    year: Math.floor(index / 12),
+    month: index % 12 + 1,
+  };
+}
+
+function monthName(month) {
+  return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][month - 1];
 }
 
 function openPaidHelper(focusId) {
@@ -699,7 +717,7 @@ function readOpportunity() {
 }
 
 function formatBenefit(amount) {
-  const text = formatMoney(Math.abs(amount));
+  const text = formatCompactMoney(Math.abs(amount));
   if (amount > 0) return "+" + text;
   if (amount < 0) return "-" + text;
   return text;
@@ -1086,8 +1104,21 @@ function formatMoney(amount) {
   });
 }
 
+function formatCompactMoney(amount) {
+  const abs = Math.abs(roundMoney(amount));
+  if (abs <= 100000) return formatMoney(amount);
+  const sign = amount < 0 ? "-" : "";
+  const thousands = Math.round(abs / 100) / 10;
+  const digits = Number.isInteger(thousands) ? 0 : 1;
+  return sign + "$" + thousands.toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }) + "K";
+}
+
 function formatSpeechMoney(amount) {
   const exact = Math.abs(roundMoney(amount));
+  if (exact > 100000) return formatCompactMoney(amount);
   const whole = Math.round(exact);
   const sign = amount < 0 ? "-" : "";
   if (whole === 0 && exact > 0) {
@@ -1190,13 +1221,14 @@ function schedulePlanIdForRow(name) {
   return map[name] || null;
 }
 
-function paymentMonthIndex(absoluteNumber) {
+function paymentMonthIndex(absoluteNumber, paid) {
+  const elapsed = paid == null ? paidMonthsShown : paid;
   if (loanStart && Number.isInteger(loanStart.year) && Number.isInteger(loanStart.month)) {
     return loanStart.year * 12 + (loanStart.month - 1) + absoluteNumber;
   }
   const now = new Date();
   const nowIndex = now.getFullYear() * 12 + now.getMonth();
-  if (paidMonthsShown > 0) return nowIndex - paidMonthsShown + absoluteNumber;
+  if (elapsed > 0) return nowIndex - elapsed + absoluteNumber;
   return nowIndex + absoluteNumber - 1;
 }
 
@@ -1602,7 +1634,7 @@ function pdfActionLine(report) {
   }
   if (report.annualExtra) {
     const item = report.annualExtra;
-    parts.push("Extra " + formatMoney(item.amount) + " at the end of each loan year from year " + item.startYear + " (" + item.count + " payments)");
+    parts.push("Extra " + formatMoney(item.amount) + " at the end of each year from " + item.startYear + " (" + item.count + " payments)");
   }
   if (report.opportunity) {
     parts.push("Cash on hand " + formatMoney(report.opportunity.cash) + " at " + report.opportunity.depositRatePercent + "% APY");
