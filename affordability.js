@@ -20,14 +20,19 @@ function expectedSearchMonths(age, industry) {
   return Math.max(1, ageRow[1] + industryRow[1]);
 }
 
+const QUICK_LIVING = 2000;
+
 function assessAffordability(input) {
   const searchMonths = expectedSearchMonths(input.age, input.industry);
   if (searchMonths == null) return { error: "choice" };
   if (!Number.isFinite(input.income) || input.income <= 0) return { error: "income" };
-  const spouse = input.spouse > 0 ? input.spouse : 0;
-  const severance = input.severance > 0 ? input.severance : 0;
+  const quick = input.mode !== "detailed";
+  const living = quick ? QUICK_LIVING : input.living;
+  if (!quick && (!Number.isFinite(living) || living < 0)) return { error: "living" };
+  const spouse = quick || !(input.spouse > 0) ? 0 : input.spouse;
+  const severance = quick || !(input.severance > 0) ? 0 : input.severance;
   const dual = spouse > 0;
-  const burn = dual ? input.piti + input.living - spouse : input.piti + input.living;
+  const burn = dual ? input.piti + living - spouse : input.piti + living;
   let unlimited = false;
   let runway = null;
   if (!(burn > 0)) {
@@ -46,7 +51,7 @@ function assessAffordability(input) {
     else if (runwayShown > 12) level = "safe";
     else level = "watch";
   }
-  const cushion = (input.savings + severance) / searchMonths - input.living + spouse;
+  const cushion = (input.savings + severance) / searchMonths - living + spouse;
   const cap = input.income * 0.36;
   if (!Number.isFinite(cushion) || !Number.isFinite(cap)) return { error: "burn" };
   const safePayment = Math.max(0, Math.min(cushion, cap));
@@ -56,7 +61,9 @@ function assessAffordability(input) {
   return {
     age: input.age,
     industry: input.industry,
-    children: input.children,
+    children: quick ? null : input.children,
+    estimatedLiving: quick,
+    living,
     searchMonths,
     burn,
     unlimited,
@@ -101,6 +108,9 @@ function readRiskMoney(id, blankValue) {
   return { value };
 }
 
+let riskMode = "quick";
+let riskHasResult = false;
+
 function readRiskForm() {
   const piti = readRiskMoney("risk-piti", null);
   if (piti.blank) return { error: "Enter the current mortgage payment (PITI)." };
@@ -116,30 +126,39 @@ function readRiskForm() {
   if (income.blank || income.invalid || income.value <= 0) {
     return { error: "Enter household monthly net income greater than 0." };
   }
-  const living = readRiskMoney("risk-living", null);
-  if (living.blank) return { error: "Enter monthly living expenses. Use 0 if you have none." };
-  if (living.invalid) return { error: "Monthly living expenses must be a number greater than or equal to 0." };
-  const spouse = readRiskMoney("risk-spouse", 0);
-  if (spouse.invalid) return { error: "Spouse or partner income must be a number greater than or equal to 0." };
-  const severance = readRiskMoney("risk-severance", 0);
-  if (severance.invalid) return { error: "Severance and unemployment benefits must be a number greater than or equal to 0." };
-  const childrenRaw = document.getElementById("risk-children").value.trim();
+  let living = QUICK_LIVING;
+  let spouse = 0;
+  let severance = 0;
   let children = null;
-  if (childrenRaw !== "") {
-    const text = childrenRaw.replace(/,/g, "");
-    if (!/^\d+$/.test(text)) return { error: "Number of children must be a whole number greater than or equal to 0." };
-    children = Number(text);
+  if (riskMode === "detailed") {
+    const livingField = readRiskMoney("risk-living", null);
+    if (livingField.blank) return { error: "Enter monthly living expenses. Detailed Estimate does not guess this number." };
+    if (livingField.invalid) return { error: "Monthly living expenses must be a number greater than or equal to 0." };
+    const spouseField = readRiskMoney("risk-spouse", 0);
+    if (spouseField.invalid) return { error: "Spouse or partner income must be a number greater than or equal to 0." };
+    const severanceField = readRiskMoney("risk-severance", 0);
+    if (severanceField.invalid) return { error: "Severance and unemployment benefits must be a number greater than or equal to 0." };
+    const childrenRaw = document.getElementById("risk-children").value.trim();
+    if (childrenRaw !== "") {
+      const text = childrenRaw.replace(/,/g, "");
+      if (!/^\d+$/.test(text)) return { error: "Number of children must be a whole number greater than or equal to 0." };
+      children = Number(text);
+    }
+    living = livingField.value;
+    spouse = spouseField.value;
+    severance = severanceField.value;
   }
   return {
     value: {
+      mode: riskMode,
       piti: piti.value,
       savings: savings.value,
       age,
       industry,
       income: income.value,
-      living: living.value,
-      spouse: spouse.value,
-      severance: severance.value,
+      living,
+      spouse,
+      severance,
       children,
     },
   };
@@ -153,12 +172,22 @@ function renderRisk(result) {
   document.getElementById("risk-headline").textContent = result.unlimited
     ? "Your emergency fund will last indefinitely."
     : "Your emergency fund will last for " + formatMonthCount(result.runwayShown) + ".";
+  const estimateNote = document.getElementById("risk-estimate-note");
+  if (result.estimatedLiving) {
+    estimateNote.hidden = false;
+    estimateNote.textContent = "Based on an estimated base living expense of $2,000/month.";
+  } else {
+    estimateNote.hidden = true;
+    estimateNote.textContent = "";
+  }
   document.getElementById("risk-search").textContent = formatMonthCount(result.searchMonths);
   document.getElementById("risk-search-note").textContent = searchNote(result.age, result.industry, result.searchMonths);
   document.getElementById("risk-burn").textContent = formatMoney(result.burn);
-  let burnNote = result.dual
-    ? "Two incomes. Spouse or partner pay is subtracted from the housing payment and living costs."
-    : "One income. The housing payment and living costs both come out of savings.";
+  let burnNote = result.estimatedLiving
+    ? "One income. Housing plus an estimated $2,000 of living expenses."
+    : result.dual
+      ? "Two incomes. Spouse or partner pay is subtracted from the housing payment and living costs."
+      : "One income. The housing payment and living costs both come out of savings.";
   if (result.burn < 0) burnNote += " Cash flow covers these costs, so savings are not drawn down.";
   else if (result.burn === 0) burnNote += " Cash flow covers these costs exactly.";
   document.getElementById("risk-burn-note").textContent = burnNote;
@@ -212,35 +241,67 @@ function showRiskModule(risk) {
   if (risk) fillPitiFromStrategy();
 }
 
+function applyRiskAssessment() {
+  const message = document.getElementById("risk-message");
+  const parsed = readRiskForm();
+  if (parsed.error) {
+    message.textContent = parsed.error;
+    document.getElementById("risk-result").hidden = true;
+    return;
+  }
+  const result = assessAffordability(parsed.value);
+  if (result.error) {
+    message.textContent = result.error === "income"
+      ? "Enter household monthly net income greater than 0."
+      : result.error === "living"
+        ? "Enter monthly living expenses. Detailed Estimate does not guess this number."
+        : "Check the numbers and try again.";
+    document.getElementById("risk-result").hidden = true;
+    return;
+  }
+  message.textContent = "";
+  renderRisk(result);
+  document.getElementById("risk-result").hidden = false;
+  riskHasResult = true;
+}
+
+function refreshIfAssessed() {
+  if (riskHasResult) applyRiskAssessment();
+}
+
+function setRiskMode(mode) {
+  riskMode = mode === "detailed" ? "detailed" : "quick";
+  const detailed = riskMode === "detailed";
+  document.getElementById("risk-detailed").hidden = !detailed;
+  document.getElementById("risk-form").classList.toggle("is-quick", !detailed);
+  document.getElementById("mode-quick").setAttribute("aria-selected", detailed ? "false" : "true");
+  document.getElementById("mode-detailed").setAttribute("aria-selected", detailed ? "true" : "false");
+  document.getElementById("estimate-mode-note").textContent = detailed
+    ? "Enter monthly living expenses. Spouse income, severance, and children are optional."
+    : "Uses a $2,000 monthly living estimate. Spouse income and severance stay at $0.";
+  refreshIfAssessed();
+}
+
 function initAffordability() {
   const form = document.getElementById("risk-form");
   if (!form) return;
   document.getElementById("tab-strategy").addEventListener("click", () => showRiskModule(false));
   document.getElementById("tab-risk").addEventListener("click", () => showRiskModule(true));
+  document.getElementById("mode-quick").addEventListener("click", () => setRiskMode("quick"));
+  document.getElementById("mode-detailed").addEventListener("click", () => setRiskMode("detailed"));
+  ["risk-piti", "risk-savings", "risk-income", "risk-living", "risk-spouse", "risk-severance", "risk-children"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", refreshIfAssessed);
+  });
+  ["risk-age", "risk-industry"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", refreshIfAssessed);
+  });
   const payment = document.getElementById("payment");
   if (payment) {
     new MutationObserver(fillPitiFromStrategy).observe(payment, { childList: true, characterData: true, subtree: true });
   }
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const message = document.getElementById("risk-message");
-    const parsed = readRiskForm();
-    if (parsed.error) {
-      message.textContent = parsed.error;
-      document.getElementById("risk-result").hidden = true;
-      return;
-    }
-    const result = assessAffordability(parsed.value);
-    if (result.error) {
-      message.textContent = result.error === "income"
-        ? "Enter household monthly net income greater than 0."
-        : "Check the numbers and try again.";
-      document.getElementById("risk-result").hidden = true;
-      return;
-    }
-    message.textContent = "";
-    renderRisk(result);
-    document.getElementById("risk-result").hidden = false;
+    applyRiskAssessment();
   });
 }
 

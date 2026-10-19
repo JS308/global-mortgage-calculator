@@ -399,7 +399,12 @@
     </div>
 
     <div id="risk-panel" class="risk-workspace" hidden>
-      <form id="risk-form" novalidate class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <form id="risk-form" novalidate class="is-quick space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="form-span estimate-modes" role="tablist" aria-label="Estimate detail">
+          <button type="button" id="mode-quick" aria-selected="true">Quick Estimate</button>
+          <button type="button" id="mode-detailed" aria-selected="false">Detailed Estimate</button>
+        </div>
+        <p id="estimate-mode-note" class="form-span text-sm leading-relaxed text-slate-500">Uses a $2,000 monthly living estimate. Spouse income and severance stay at $0.</p>
         <label class="block text-sm font-medium text-slate-700">
           Current mortgage payment (PITI)
           <input id="risk-piti" name="risk-piti" type="text" inputmode="decimal" placeholder="e.g. 3,160" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
@@ -431,31 +436,33 @@
             <option value="healthcare">Healthcare</option>
           </select>
         </label>
-        <label class="block text-sm font-medium text-slate-700">
+        <label id="risk-income-field" class="block text-sm font-medium text-slate-700">
           Household monthly net income
           <input id="risk-income" name="risk-income" type="text" inputmode="decimal" placeholder="e.g. 8,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
           <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">After-tax income for the household. This is the denominator for the housing DTI.</span>
         </label>
-        <label class="block text-sm font-medium text-slate-700">
-          Monthly living expenses
-          <input id="risk-living" name="risk-living" type="text" inputmode="decimal" placeholder="e.g. 2,500" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-          <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Everyday spending with the mortgage payment left out.</span>
-        </label>
-        <label class="block text-sm font-medium text-slate-700">
-          Spouse/partner monthly income
-          <input id="risk-spouse" name="risk-spouse" type="text" inputmode="decimal" placeholder="Optional" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-          <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Optional. If you enter it, the household is treated as two incomes.</span>
-        </label>
-        <label class="block text-sm font-medium text-slate-700">
-          Estimated severance &amp; unemployment benefits
-          <input id="risk-severance" name="risk-severance" type="text" inputmode="decimal" placeholder="Optional" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-          <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Optional. A one-time total, added to liquid savings.</span>
-        </label>
-        <label class="form-span block text-sm font-medium text-slate-700">
-          Children
-          <input id="risk-children" name="risk-children" type="text" inputmode="numeric" placeholder="Optional" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-          <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Optional. Not used in the math. Include their costs in living expenses.</span>
-        </label>
+        <div id="risk-detailed" class="form-span risk-detailed" hidden>
+          <label class="block text-sm font-medium text-slate-700">
+            Monthly living expenses
+            <input id="risk-living" name="risk-living" type="text" inputmode="decimal" placeholder="e.g. 2,500" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Required in Detailed Estimate. Everyday spending with the mortgage payment left out. Use 0 only if you truly have none.</span>
+          </label>
+          <label class="block text-sm font-medium text-slate-700">
+            Spouse/partner monthly income
+            <input id="risk-spouse" name="risk-spouse" type="text" inputmode="decimal" placeholder="Optional" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Optional. If you enter it, the household is treated as two incomes.</span>
+          </label>
+          <label class="block text-sm font-medium text-slate-700">
+            Estimated severance &amp; unemployment benefits
+            <input id="risk-severance" name="risk-severance" type="text" inputmode="decimal" placeholder="Optional" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Optional. A one-time total, added to liquid savings.</span>
+          </label>
+          <label class="form-span block text-sm font-medium text-slate-700">
+            Children
+            <input id="risk-children" name="risk-children" type="text" inputmode="numeric" placeholder="Optional" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+            <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Optional. Not used in the math. Include their costs in living expenses.</span>
+          </label>
+        </div>
         <button type="submit" class="form-span w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800">Assess risk</button>
       </form>
       <div class="risk-results">
@@ -468,6 +475,7 @@
           <article id="risk-verdict" class="risk-verdict">
             <p id="risk-rating" class="risk-badge"></p>
             <h2 id="risk-headline" class="mt-2 text-2xl font-semibold tracking-tight"></h2>
+            <p id="risk-estimate-note" hidden class="mt-2 text-sm leading-relaxed"></p>
           </article>
           <div class="risk-metrics">
             <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
