@@ -11,7 +11,7 @@
      crossorigin="anonymous"></script>
 </head>
 <body class="min-h-screen bg-slate-50 font-sans text-slate-900">
-  <main class="mx-auto w-full max-w-xl px-4 py-6 sm:py-10">
+  <main class="page-shell mx-auto w-full max-w-xl px-4 py-6 sm:py-10">
     <header class="mb-5 flex items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-semibold tracking-tight">Mortgage payoff strategies</h1>
@@ -20,6 +20,7 @@
       <span id="method-badge" class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">Fixed payment</span>
     </header>
 
+    <div class="page-workspace">
     <form id="form" novalidate class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div>
         <p class="text-sm font-medium text-slate-700">Loan type</p>
@@ -37,7 +38,7 @@
         </div>
       </div>
 
-      <div id="single-fields" class="space-y-4">
+      <div id="single-fields" class="form-span space-y-4">
         <label class="block text-sm font-medium text-slate-700">
           Loan amount
           <input id="principal" name="principal" type="text" inputmode="decimal" placeholder="e.g. 500,000" autocomplete="off" required class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
@@ -48,7 +49,7 @@
         </label>
       </div>
 
-      <section id="arm-fields" hidden class="space-y-4">
+      <section id="arm-fields" hidden class="form-span space-y-4">
         <p class="text-sm leading-relaxed text-slate-500">The initial rate is used for the fixed period. After that, the payment is recast at the adjusted rate for the remaining term.</p>
         <label class="block text-sm font-medium text-slate-700">
           Initial fixed period (years)
@@ -65,7 +66,13 @@
         <input id="years" name="years" type="text" inputmode="numeric" placeholder="e.g. 30" autocomplete="off" required class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
       </label>
 
-      <details id="paid-panel" class="border-t border-slate-200 pt-4">
+      <label id="single-prepay" class="block text-sm font-medium text-slate-700">
+        Extra principal payment (optional)
+        <input id="prepay" name="prepay" type="text" inputmode="decimal" placeholder="e.g. 10,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
+      </label>
+      <p class="form-span text-sm leading-relaxed text-slate-500">Applied to principal with the next payment. Compares paying the loan off sooner with keeping the term and lowering the payment.</p>
+
+      <details id="paid-panel" class="form-span border-t border-slate-200 pt-4">
         <summary>
           <span class="paid-summary-text">Optional: If you have already started paying this mortgage, tap here (a more accurate result) 👇</span>
         </summary>
@@ -89,7 +96,7 @@
         </div>
       </details>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div class="form-span grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label class="block text-sm font-medium text-slate-700">
           PMI (monthly)
           <input id="pmi" name="pmi" type="text" inputmode="decimal" placeholder="e.g. 200" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
@@ -103,15 +110,9 @@
           <input id="home-insurance" name="home-insurance" type="text" inputmode="decimal" placeholder="e.g. 1,800" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
         </label>
       </div>
-      <p class="-mt-2 text-sm leading-relaxed text-slate-500">PMI is common when the down payment is under 20%. Enter the monthly premium. Property tax and homeowners insurance are annual amounts, split across 12 months and added to the payment.</p>
+      <p class="form-span text-sm leading-relaxed text-slate-500">PMI is common when the down payment is under 20%. Enter the monthly premium. Property tax and homeowners insurance are annual amounts, split across 12 months and added to the payment.</p>
 
-      <label id="single-prepay" class="block text-sm font-medium text-slate-700">
-        Extra principal payment (optional)
-        <input id="prepay" name="prepay" type="text" inputmode="decimal" placeholder="e.g. 10,000" autocomplete="off" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-slate-900 focus:ring-2">
-        <span class="mt-1.5 block text-sm font-normal leading-relaxed text-slate-500">Applied to principal with the next payment. Compares paying the loan off sooner with keeping the term and lowering the payment.</span>
-      </label>
-
-      <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800">
+      <label class="form-span flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800">
         <input id="biweekly" name="biweekly" type="checkbox" class="mt-0.5 size-4 accent-slate-900">
         <span>
           <span class="font-semibold">Bi-weekly payments</span>
@@ -119,7 +120,7 @@
         </span>
       </label>
 
-      <details class="border-t border-slate-200 pt-4">
+      <details class="form-span border-t border-slate-200 pt-4">
         <summary class="text-base font-semibold">
           Additional principal payments
           <span class="fold-hint">Optional · yearly or one-time</span>
@@ -199,10 +200,15 @@
         </div>
       </details>
 
-      <button type="submit" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800">Calculate</button>
+      <button type="submit" class="form-span w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800">Calculate</button>
     </form>
 
+    <div class="page-results">
     <p id="message" class="empty:hidden mt-3 text-sm text-rose-700" role="alert"></p>
+    <section class="desktop-placeholder">
+      <p class="text-sm font-semibold text-slate-800">Results show up here</p>
+      <p class="mt-2 text-sm leading-relaxed text-slate-500">Enter the loan on the left and choose Calculate. The monthly payment, interest saved, charts, and schedule stay on this side.</p>
+    </section>
 
     <dialog id="image-preview" class="image-preview" aria-labelledby="image-preview-title">
       <div class="space-y-3 p-4">
@@ -332,7 +338,7 @@
 
       <details id="charts-details" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <summary class="text-base font-semibold">Charts</summary>
-        <div class="mt-4 space-y-4">
+        <div class="chart-pair mt-4 space-y-4">
           <article>
             <p class="text-sm font-medium text-slate-700">Remaining balance</p>
             <p id="chart-note" class="empty:hidden mt-1 text-sm text-rose-700"></p>
@@ -385,6 +391,8 @@
 
       <button type="button" id="export-pdf" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-800 disabled:opacity-60">Generate image report</button>
     </section>
+    </div>
+    </div>
   </main>
   <p class="site-disclaimer"><strong>Disclaimer.</strong> This tool is only for personal math estimates and technical discussion. It is not financial, investment, or loan advice. Every number is entered by you. Your payment, interest, and loan terms are set by your lender.</p>
   <footer class="site-footer">© 2026 <a href="index.html">Mortgage Payoff Calculator</a> | <a href="about.html">About</a> | <a href="privacy.html">Privacy</a> | <a href="about.html#disclaimer">Disclaimer</a></footer>

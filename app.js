@@ -116,6 +116,10 @@ document.getElementById("balance-chart").closest("details").addEventListener("to
   if (balanceChart) balanceChart.resize();
   if (interestChart) interestChart.resize();
 });
+window.addEventListener("resize", () => {
+  if (balanceChart) balanceChart.resize();
+  if (interestChart) interestChart.resize();
+});
 ["years", "arm-years", "paid-months"].forEach((id) => {
   document.getElementById(id).addEventListener("input", refreshRemaining);
 });
