@@ -926,6 +926,189 @@ input.field-missing {
   font-weight: 600;
 }
 
+.risk-footnote {
+  margin-top: 0.45rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.risk-safe-card,
+.dti-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.15rem 1.25rem 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.risk-safe-amount {
+  margin-top: 0.15rem;
+  font-size: 3rem;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-advice {
+  margin-top: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.risk-advice.is-safe {
+  background: #ecfdf5;
+  color: #064e3b;
+}
+
+.risk-advice.is-watch {
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.risk-advice.is-danger {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.dti-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dti-value {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dti-value.is-elevated {
+  color: #92400e;
+}
+
+.dti-value.is-high {
+  color: #be123c;
+}
+
+.dti-meter {
+  margin-top: 1.6rem;
+}
+
+.dti-meter-track {
+  position: relative;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.dti-meter-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: #059669;
+}
+
+.dti-meter-fill.is-elevated {
+  background: #d97706;
+}
+
+.dti-meter-fill.is-high {
+  background: #e11d48;
+}
+
+.dti-meter-line {
+  position: absolute;
+  top: -0.28rem;
+  width: 2px;
+  height: 1.25rem;
+  background: #334155;
+}
+
+.dti-meter-line.is-max {
+  background: #be123c;
+}
+
+.dti-tick-label {
+  position: absolute;
+  bottom: calc(100% + 0.35rem);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: #334155;
+}
+
+.dti-tick-label.is-preferred {
+  left: 72%;
+  transform: translateX(-100%);
+  padding-right: 0.35rem;
+}
+
+.dti-tick-label.is-max {
+  left: 86%;
+  padding-left: 0.35rem;
+  color: #9f1239;
+}
+
+.dti-meter-mark {
+  position: absolute;
+  top: 50%;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-top: -0.45rem;
+  margin-left: -0.45rem;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #059669;
+  box-shadow: 0 0 0 1px #059669;
+}
+
+.dti-meter-mark.is-elevated {
+  background: #d97706;
+  box-shadow: 0 0 0 1px #d97706;
+}
+
+.dti-meter-mark.is-high {
+  background: #e11d48;
+  box-shadow: 0 0 0 1px #e11d48;
+}
+
+.dti-meter-ends,
+.dti-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.dti-legend {
+  display: none;
+}
+
+.dti-swatch {
+  display: inline-block;
+  width: 2px;
+  height: 0.7rem;
+  margin-right: 0.35rem;
+  vertical-align: -1px;
+  background: #334155;
+}
+
+.dti-swatch.is-max {
+  background: #be123c;
+}
+
 .risk-metrics {
   display: grid;
   grid-template-columns: 1fr;
@@ -941,11 +1124,24 @@ input.field-missing {
   .module-tabs button {
     flex: 1;
   }
+
+  .dti-tick-label {
+    display: none;
+  }
+
+  .dti-legend {
+    display: flex;
+    justify-content: flex-start;
+    gap: 1rem;
+    margin-top: 0.45rem;
+    font-weight: 600;
+    color: #334155;
+  }
 }
 
 @media (min-width: 640px) {
   .risk-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr;
   }
 }
 

@@ -87,17 +87,17 @@ function formatMonthCount(value) {
 function searchNote(age, industry, months) {
   const [ageLabel, base] = AGE_BASELINE[age];
   const [industryLabel, shift] = INDUSTRY_SHIFT[industry];
-  let note = ageLabel + " starts at " + formatMonthCount(base) + ".";
-  if (shift > 0) note += " " + industryLabel + " adds " + formatMonthCount(shift) + ".";
-  else if (shift < 0) note += " " + industryLabel + " shortens that by " + formatMonthCount(Math.abs(shift)) + ".";
-  else note += " " + industryLabel + " does not change it.";
-  if (months !== base + shift) note += " Shown time is kept at 1 month so the safe payment can be calculated.";
+  let note = ageLabel + " baseline " + base + " mo.";
+  if (shift > 0) note += " " + industryLabel + " +" + shift + " mo.";
+  else if (shift < 0) note += " " + industryLabel + " " + shift + " mo.";
+  else note += " " + industryLabel + " no change.";
+  if (months !== base + shift) note += " Floor 1 mo.";
   return note;
 }
 
 function adviceSentence(months, payment) {
   const article = months === 8 || months === 11 || months === 18 ? "an" : "a";
-  return "To survive " + article + " " + months + "-month job search without defaulting, your monthly housing payment should not exceed " + formatMoney(payment) + ".";
+  return "To survive " + article + " " + months + "-month job search and keep DTI under 36%, your housing payment should not exceed " + formatMoney(payment) + ".";
 }
 
 function readRiskMoney(id, blankValue) {
@@ -191,18 +191,24 @@ function renderRisk(result) {
   if (result.burn < 0) burnNote += " Cash flow covers these costs, so savings are not drawn down.";
   else if (result.burn === 0) burnNote += " Cash flow covers these costs exactly.";
   document.getElementById("risk-burn-note").textContent = burnNote;
-  document.getElementById("risk-dti").textContent = result.dtiShown.toFixed(1) + "%";
+  const dtiText = document.getElementById("risk-dti");
+  dtiText.textContent = result.dtiShown.toFixed(1) + "%";
+  dtiText.className = "dti-value is-" + result.dtiBand;
+  const dtiPct = Math.max(0, Math.min(result.dtiShown, 50)) / 50 * 100;
+  const dtiFill = document.getElementById("risk-dti-fill");
+  const dtiMark = document.getElementById("risk-dti-mark");
+  dtiFill.style.width = dtiPct + "%";
+  dtiMark.style.left = dtiPct + "%";
+  dtiFill.className = "dti-meter-fill is-" + result.dtiBand;
+  dtiMark.className = "dti-meter-mark is-" + result.dtiBand;
   const dtiNote = document.getElementById("risk-dti-note");
-  if (result.dtiBand === "high") {
-    dtiNote.textContent = "Above 43%. Lenders often treat a housing burden past this line as high risk.";
-  } else if (result.dtiBand === "elevated") {
-    dtiNote.textContent = "Above 36%. This is past the preferred U.S. housing limit.";
-  } else {
-    dtiNote.textContent = "At or under 36%, the preferred U.S. housing limit.";
-  }
-  dtiNote.className = "mt-2 text-xs leading-relaxed " + (result.dtiBand === "ok" ? "text-slate-500" : "text-rose-700");
+  if (result.dtiBand === "high") dtiNote.textContent = "Above 43% Max.";
+  else if (result.dtiBand === "elevated") dtiNote.textContent = "Above 36% Preferred.";
+  else dtiNote.textContent = "Within 36% Preferred.";
   document.getElementById("risk-safe").textContent = formatMoney(result.safePayment);
-  document.getElementById("risk-advice").textContent = adviceSentence(result.searchMonths, result.safePayment);
+  const advice = document.getElementById("risk-advice");
+  advice.textContent = adviceSentence(result.searchMonths, result.safePayment);
+  advice.className = "risk-advice is-" + result.level;
   let safeNote = "The lower of the job-search cushion and 36% of household monthly net income.";
   if (result.cushion < 0) {
     safeNote = "Savings and severance do not cover living expenses through that job search, so the safe housing payment is $0.";
