@@ -825,8 +825,93 @@ input.field-missing {
   color: #0f172a;
 }
 
-.desktop-placeholder {
+.desktop-placeholder,
+.risk-placeholder {
   display: none;
+}
+
+#strategy-panel[hidden],
+#risk-panel[hidden] {
+  display: none !important;
+}
+
+.module-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  padding: 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.module-tabs button {
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.module-tabs button[aria-selected="true"] {
+  background: #0f172a;
+  color: #fff;
+}
+
+.risk-verdict {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem 1.25rem;
+}
+
+.risk-verdict.is-safe {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+  color: #064e3b;
+}
+
+.risk-verdict.is-watch {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.risk-verdict.is-danger {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.risk-badge {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.risk-metrics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 639px) {
+  .module-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .module-tabs button {
+    flex: 1;
+  }
+}
+
+@media (min-width: 640px) {
+  .risk-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 1024px) {
@@ -851,26 +936,38 @@ input.field-missing {
   }
 
   #form,
-  .page-results {
+  #risk-form,
+  .page-results,
+  .risk-results {
     min-width: 0;
+  }
+
+  .risk-workspace {
+    display: grid;
+    grid-template-columns: minmax(22rem, 32rem) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
   }
 
   .page-results {
     container-type: inline-size;
   }
 
-  #form {
+  #form,
+  #risk-form {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.9rem 1rem;
     align-items: start;
   }
 
-  #form > * {
+  #form > *,
+  #risk-form > * {
     margin-top: 0 !important;
   }
 
-  #form > .form-span {
+  #form > .form-span,
+  #risk-form > .form-span {
     grid-column: 1 / -1;
   }
 
@@ -888,8 +985,23 @@ input.field-missing {
   }
 
   #result,
-  #message {
+  #message,
+  #risk-result,
+  #risk-message {
     margin-top: 0;
+  }
+
+  .risk-placeholder {
+    display: block;
+    border: 1px dashed #cbd5e1;
+    border-radius: 1rem;
+    background: #fff;
+    padding: 1.5rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
+
+  body:has(#risk-result:not([hidden])) .risk-placeholder {
+    display: none;
   }
 
   #single-fields {
