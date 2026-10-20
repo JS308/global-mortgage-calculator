@@ -7,6 +7,62 @@
   <meta name="description" content="Free U.S. mortgage payoff calculator in dollars. See how extra principal payments, bi-weekly payments, and refinancing cut interest, and add PMI, property tax, and homeowners insurance to the monthly payment.">
   <meta name="keywords" content="mortgage calculator, extra payment, bi-weekly mortgage, refinance, PMI, property tax, homeowners insurance, ARM, fixed-rate mortgage">
   <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is it better to pay off my mortgage early or invest the money?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "It depends on the opportunity cost. If your expected investment return (APY) is higher than your mortgage interest rate, investing usually yields a better net financial outcome. However, paying off early offers a guaranteed, risk-free return. Use our \"Opportunity Cost\" tool above to compare both scenarios instantly."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does a bi-weekly mortgage payment work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Instead of making 12 monthly payments, you pay half of your monthly payment every two weeks. Because there are 52 weeks in a year, you end up making 26 half-payments, which equals 13 full monthly payments. This extra payment goes directly to the principal, helping you pay off the loan years earlier and saving significant interest."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is a good DTI (Debt-to-Income) ratio for a mortgage?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Lenders typically prefer a housing DTI ratio (monthly housing payment divided by gross monthly income) of 28% or less. For total debt, the standard limit is 36%, though some automated underwriting systems allow up to 43%. Anything above 43% is generally considered high risk."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What are closing costs when buying a house?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Closing costs are fees paid at the end of a real estate transaction, typically ranging from 3% to 6% of the purchase price. They include lender fees, title insurance, appraisal fees, and prepaid taxes/insurance. Use our \"Upfront Costs\" calculator to estimate your total cash needed."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between a Fixed-Rate and an ARM (Adjustable-Rate Mortgage)?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "A Fixed-Rate mortgage locks in your interest rate for the entire loan term, offering predictable payments. An ARM offers a lower initial rate for a fixed period (e.g., 5 or 7 years), but the rate will adjust up or down annually after that. Our calculator allows you to simulate ARM adjustments."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How much house can I afford if I lose my job?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Standard affordability calculators assume you will always have a steady income. To calculate a truly safe mortgage amount, you should factor in your liquid savings, living expenses, and job search runway. Use our \"Affordability Risk\" tool to see how long your savings can cover a mortgage payment during unemployment."
+        }
+      }
+    ]
+  }
+  </script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6431358405535534"
      crossorigin="anonymous"></script>
 </head>
@@ -16,12 +72,13 @@
       <button type="button" id="tab-strategy" role="tab" aria-selected="true" aria-controls="strategy-panel">Mortgage Strategy</button>
       <button type="button" id="tab-risk" role="tab" aria-selected="false" aria-controls="risk-panel">Affordability Risk</button>
     </div>
-    <header class="mb-5 flex items-center justify-between gap-3">
-      <div>
+    <header class="mb-5">
+      <div class="page-title-row">
         <h1 id="page-title" class="text-2xl font-semibold tracking-tight">Mortgage payoff strategies</h1>
-        <p id="page-subtitle" class="mt-1 text-sm text-slate-500">Compare extra payments, refinancing, and opportunity cost</p>
+        <span id="method-badge" class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">Fixed payment</span>
       </div>
-      <span id="method-badge" class="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">Fixed payment</span>
+      <h2 class="page-seo-subtitle">Free U.S. mortgage payoff calculator. Compare extra payments, bi-weekly, and opportunity costs.</h2>
+      <p id="page-subtitle" class="mt-1 text-sm text-slate-500">Compare extra payments, refinancing, and opportunity cost</p>
     </header>
 
     <div id="strategy-panel" class="page-workspace">
@@ -521,11 +578,77 @@
         </section>
       </div>
     </div>
+
+    <section id="faq" class="faq-section" aria-labelledby="faq-heading">
+      <div class="faq-head">
+        <h2 id="faq-heading">Frequently Asked Questions</h2>
+        <button type="button" id="faq-toggle-all" class="faq-toggle" aria-expanded="false">Expand All</button>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Is it better to pay off my mortgage early or invest the money?</summary>
+          <p>It depends on the opportunity cost. If your expected investment return (APY) is higher than your mortgage interest rate, investing usually yields a better net financial outcome. However, paying off early offers a guaranteed, risk-free return. Use our "Opportunity Cost" tool above to compare both scenarios instantly.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How does a bi-weekly mortgage payment work?</summary>
+          <p>Instead of making 12 monthly payments, you pay half of your monthly payment every two weeks. Because there are 52 weeks in a year, you end up making 26 half-payments, which equals 13 full monthly payments. This extra payment goes directly to the principal, helping you pay off the loan years earlier and saving significant interest.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What is a good DTI (Debt-to-Income) ratio for a mortgage?</summary>
+          <p>Lenders typically prefer a housing DTI ratio (monthly housing payment divided by gross monthly income) of 28% or less. For total debt, the standard limit is 36%, though some automated underwriting systems allow up to 43%. Anything above 43% is generally considered high risk.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What are closing costs when buying a house?</summary>
+          <p>Closing costs are fees paid at the end of a real estate transaction, typically ranging from 3% to 6% of the purchase price. They include lender fees, title insurance, appraisal fees, and prepaid taxes/insurance. Use our "Upfront Costs" calculator to estimate your total cash needed.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What is the difference between a Fixed-Rate and an ARM (Adjustable-Rate Mortgage)?</summary>
+          <p>A Fixed-Rate mortgage locks in your interest rate for the entire loan term, offering predictable payments. An ARM offers a lower initial rate for a fixed period (e.g., 5 or 7 years), but the rate will adjust up or down annually after that. Our calculator allows you to simulate ARM adjustments.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How much house can I afford if I lose my job?</summary>
+          <p>Standard affordability calculators assume you will always have a steady income. To calculate a truly safe mortgage amount, you should factor in your liquid savings, living expenses, and job search runway. Use our "Affordability Risk" tool to see how long your savings can cover a mortgage payment during unemployment.</p>
+        </details>
+      </div>
+    </section>
   </main>
   <p class="site-disclaimer"><strong>Disclaimer.</strong> This tool is only for personal math estimates and technical discussion. It is not financial, investment, or loan advice. Every number is entered by you. Your payment, interest, and loan terms are set by your lender.</p>
   <footer class="site-footer">© 2026 <a href="index.html">Mortgage Payoff Calculator</a> | <a href="about.html">About</a> | <a href="privacy.html">Privacy</a> | <a href="about.html#disclaimer">Disclaimer</a></footer>
   <script src="mortgage.js"></script>
   <script src="app.js"></script>
   <script src="affordability.js"></script>
+  <script>
+    (function () {
+      var section = document.getElementById("faq");
+      var button = document.getElementById("faq-toggle-all");
+      if (!section || !button) return;
+      var items = section.querySelectorAll("details");
+      var syncing = false;
+
+      function allOpen() {
+        return Array.prototype.every.call(items, function (item) { return item.open; });
+      }
+
+      function syncButton() {
+        var expanded = allOpen();
+        button.textContent = expanded ? "Collapse All" : "Expand All";
+        button.setAttribute("aria-expanded", expanded ? "true" : "false");
+      }
+
+      button.addEventListener("click", function () {
+        var expand = !allOpen();
+        syncing = true;
+        Array.prototype.forEach.call(items, function (item) { item.open = expand; });
+        syncing = false;
+        syncButton();
+      });
+
+      Array.prototype.forEach.call(items, function (item) {
+        item.addEventListener("toggle", function () {
+          if (!syncing) syncButton();
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
